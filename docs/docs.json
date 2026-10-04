@@ -1,0 +1,48 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Plug",
+  "colors": {
+    "primary": "#5b783b",
+    "light": "#98ae6a",
+    "dark": "#263e2b"
+  },
+  "navigation": {
+    "groups": [
+      {
+        "group": "Start",
+        "pages": [
+          "introduction",
+          "docs/quickstart",
+          "docs/concepts",
+          "docs/flight-search"
+        ]
+      },
+      {
+        "group": "Specification",
+        "pages": [
+          "specification/draft/index",
+          "specification/draft/architecture",
+          "specification/draft/system-profile",
+          "specification/draft/experience",
+          "specification/draft/patterns",
+          "specification/draft/recommendations",
+          "specification/draft/changelog",
+          "specification/draft/schema"
+        ]
+      },
+      {
+        "group": "Development",
+        "pages": ["development/setup", "development/deployment"]
+      },
+      {
+        "group": "Community",
+        "pages": [
+          "community/design-principles",
+          "community/sep-guidelines",
+          "seps/0000-public-alpha-design"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,23 @@
+---
+title: Pattern catalog
+---
+
+The catalog contains direct request, cache-aside, scheduled refresh/prefetch + cache,
+progressive useful output + live completion, scheduled cache with miss filling, and
+cached initial output followed by live refresh. General composition is deferred.
+
+Cache requires an eligible read, explicit permission, complete scoped keys and
+accepted indicative age. Only enumerated keys are retained; other keys do not evict
+hot entries. Calls coalesce per key. Failed refreshes never advance timestamps.
+
+For start-to-start cadence I, bounded duration D, scheduling allowance J, source lag L,
+and delivery allowance U, require I + D + J + L + U <= maxAge. Reads reserve U too.
+Candidate intervals are 1, 5, 10, 15, 30, 60, 120, 300 and 600 seconds. Prefer the
+largest feasible interval, optionally at most half the typical change interval as a
+soft heuristic. Per-key cyclic offsets are checked for overlap, capacity and quota.
+
+Replay starts cold with visible scheduled prewarm work, uses the exact policy, counts
+expiry/refill gaps and unenumerated keys, and assumes successful bounded source calls.
+Absent matching observed policy evidence or a supplied trace, coverage is unknown.
+Continuous replay work is capped; oversized simulation needs better bounded evidence.
+Runtime failures and restarts can reduce replay coverage and require revalidation.

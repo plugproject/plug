@@ -1,0 +1,50 @@
+---
+title: Quickstart
+---
+
+Use Node 24. Clone the owner-authorized repository, then run:
+
+```sh
+npm ci
+npm run check
+npm run dev
+```
+
+Open http://localhost:3000. The dev server stays running until Ctrl-C. Restore the
+flight example, Suggest design, select the scheduled cache, then Start. Warmup uses
+real 15-second HTTP requests. Request either hot key after warmup. Change data and
+wait for the later 60-second cadence; observe the new version after refresh completes.
+Cancel releases the sandbox. Full lifetime is 120 seconds.
+
+```sh
+npm run example:flight
+npm run example:http
+```
+
+The flight example exits after 120 seconds; the custom inventory service and local
+scheduler stay running until Ctrl-C. Both restart cold. For production, place the
+scheduler in an always-running service/cron and use a suitable cache; this bounded
+single-process alpha does not provide durable jobs or high availability.
+
+```sh
+npm run build
+npm pack --workspace @plugproject/plug --pack-destination /tmp
+```
+
+Install the resulting tarball in a fresh directory outside this workspace with
+`npm install /tmp/plugproject-plug-0.1.0-alpha.2.tgz`. Public distribution still awaits
+the owner's license choice. Copy `examples/your-http-api/input.json`, change both
+system descriptions, explicit mappings, input/output contract, profile and exact
+keys to match your service. The source must accept POST JSON and return
+`{snapshotAt, version, data}`. Snapshot time is Unix epoch milliseconds; `data` must
+match the declared output schema. Local bindings use trusted loopback HTTP only.
+
+```sh
+npx plug analyze input.json --out report
+npx plug explain input.json
+npx plug demo input.json --endpoint http://127.0.0.1:4010/inventory
+```
+
+Analyze performs no calls. Demo executes only the explicitly bound local service.
+Exports are `design.json`, `design.md` (with Mermaid), and `runner.json` containing
+input/catalog/design hashes. Do not change requirements just to obtain feasibility.

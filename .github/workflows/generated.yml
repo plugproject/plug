@@ -1,0 +1,17 @@
+name: Generated artifacts
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  generated:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run generate
+      - run: git diff --exit-code -- schema/draft/schema.json schema/draft/validators.js schema/draft/validators.d.ts docs/specification/draft/schema.mdx docs/seps
+      - run: test -z "$(git ls-files --others --exclude-standard schema/draft docs/seps)"

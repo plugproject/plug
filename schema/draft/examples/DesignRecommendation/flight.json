@@ -1,0 +1,2368 @@
+{
+  "formatVersion": "0.1-alpha.2",
+  "catalogVersion": "0.1-alpha.2/catalog-1",
+  "catalogHash": "6db62b29aef3fc5c5cbb016bafefa690fc29a227d5f8d52bcade31a65601bb03",
+  "inputHash": "67f171929ac7196ac47bfedea59a131b3edfbdb6a834937cc7be9cf22bf203c4",
+  "selectedId": "scheduled-cache",
+  "candidates": [
+    {
+      "id": "scheduled-cache",
+      "title": "Scheduled refresh + cache",
+      "components": ["Exact-key cache", "Refresh scheduler"],
+      "status": "feasible_under_declared_assumptions",
+      "criteria": [
+        {
+          "id": "metadata-version",
+          "verdict": "pass_under_assumptions",
+          "reason": "Metadata semantics are evaluated only for pinned protocol versions.",
+          "actual": null,
+          "required": null,
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "contract",
+          "verdict": "pass_under_assumptions",
+          "reason": "Explicit top-level input/output mappings and structured operation schemas are required. Nested conversions require an adapter.",
+          "actual": null,
+          "required": null,
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "interface",
+          "verdict": "pass_under_assumptions",
+          "reason": "Caller can invoke the exposed protocol and version.",
+          "actual": 0,
+          "required": "known adapter overhead",
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "semantics",
+          "verdict": "pass_under_assumptions",
+          "reason": "The operation must produce the requested useful output; names, progress acknowledgements and skill prose cannot establish equivalence.",
+          "actual": "indicative flight options",
+          "required": "indicative flight options",
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "read-only",
+          "verdict": "pass_under_assumptions",
+          "reason": "Only declared reads may enter a cache.",
+          "actual": "read",
+          "required": "read",
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "permission",
+          "verdict": "pass_under_assumptions",
+          "reason": "Both source permission and allowed infrastructure must permit caching.",
+          "actual": "true",
+          "required": "true",
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "correctness",
+          "verdict": "pass_under_assumptions",
+          "reason": "Cached indicative results cannot substitute for a required live result.",
+          "actual": "indicative",
+          "required": "indicative",
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "key-scope",
+          "verdict": "pass_under_assumptions",
+          "reason": "Every output-changing dimension and user/tenant identity must form the exact key.",
+          "actual": "public",
+          "required": "known complete scope",
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "age-bound",
+          "verdict": "pass_under_assumptions",
+          "reason": "Fetch duration, source lag and delivery allowance must fit the accepted result age.",
+          "actual": 21000,
+          "required": 90000,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "storage",
+          "verdict": "pass_under_assumptions",
+          "reason": "Pinned exact-key entries must fit cache capacity and memory.",
+          "actual": 8192,
+          "required": 1048576,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "scheduling",
+          "verdict": "pass_under_assumptions",
+          "reason": "The design introduces a scheduler and requires permission.",
+          "actual": null,
+          "required": null,
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "enumerable-keys",
+          "verdict": "pass_under_assumptions",
+          "reason": "Scheduled work requires explicitly enumerable exact keys.",
+          "actual": 2,
+          "required": "nonempty exact keys",
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "refresh-schedule",
+          "verdict": "pass_under_assumptions",
+          "reason": "Deterministic evenly spaced cyclic starts must meet age, per-key nonoverlap, quota and concurrency.",
+          "actual": 60000,
+          "required": "feasible interval",
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "latency-estimate",
+          "verdict": "pass_under_assumptions",
+          "reason": "Complete-path point estimate including adapter, agent, mapping, network and rendering.",
+          "actual": 1000,
+          "required": 2000,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "traffic-slo",
+          "verdict": "pass_under_assumptions",
+          "reason": "Usable-hit replay × separately supplied within-target hit fraction; hot-key share is only a ceiling.",
+          "actual": 0.9702,
+          "required": 0.95,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "quota",
+          "verdict": "pass_under_assumptions",
+          "reason": "Scheduled calls plus foreground/miss/live traffic must fit shared quota and call budget.",
+          "actual": 4,
+          "required": 6,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "concurrency-load",
+          "verdict": "pass_under_assumptions",
+          "reason": "Necessary mean load check; exact cyclic schedule and bounded source admission also apply.",
+          "actual": 1.3333333333333333,
+          "required": 2,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        }
+      ],
+      "diagram": "flowchart LR\n  A[Existing caller] --> C[Introduced exact-key cache]\n  C --> U[Indicative output + age]\n  S[Introduced scheduler] --> B[Existing slow source]\n  B --> C\n  C -. miss / expiry .-> B\n  U -. commitment .-> V[Live revalidation]",
+      "config": {
+        "formatVersion": "0.1-alpha.2",
+        "pattern": "scheduled-cache",
+        "scope": "public",
+        "keyDimensions": [
+          "origin",
+          "destination",
+          "departureDate",
+          "returnDate",
+          "adults",
+          "children",
+          "infants",
+          "cabin",
+          "currency",
+          "locale",
+          "fareContext"
+        ],
+        "maxAgeMs": 90000,
+        "deliveryAllowanceMs": 1000,
+        "capacity": 2,
+        "maxBytes": 1048576,
+        "refreshIntervalMs": 60000,
+        "schedule": [
+          {
+            "key": {
+              "origin": "DEL",
+              "destination": "LHR",
+              "departureDate": "2026-12-15",
+              "returnDate": "2026-12-22",
+              "adults": 1,
+              "children": 0,
+              "infants": 0,
+              "cabin": "economy",
+              "currency": "INR",
+              "locale": "en-IN",
+              "fareContext": "public"
+            },
+            "offsetMs": 0
+          },
+          {
+            "key": {
+              "origin": "BOM",
+              "destination": "SIN",
+              "departureDate": "2026-12-15",
+              "returnDate": "2026-12-22",
+              "adults": 1,
+              "children": 0,
+              "infants": 0,
+              "cabin": "economy",
+              "currency": "INR",
+              "locale": "en-IN",
+              "fareContext": "public"
+            },
+            "offsetMs": 30000
+          }
+        ],
+        "prewarmKeys": [
+          {
+            "origin": "DEL",
+            "destination": "LHR",
+            "departureDate": "2026-12-15",
+            "returnDate": "2026-12-22",
+            "adults": 1,
+            "children": 0,
+            "infants": 0,
+            "cabin": "economy",
+            "currency": "INR",
+            "locale": "en-IN",
+            "fareContext": "public"
+          },
+          {
+            "origin": "BOM",
+            "destination": "SIN",
+            "departureDate": "2026-12-15",
+            "returnDate": "2026-12-22",
+            "adults": 1,
+            "children": 0,
+            "infants": 0,
+            "cabin": "economy",
+            "currency": "INR",
+            "locale": "en-IN",
+            "fareContext": "public"
+          }
+        ],
+        "concurrency": 2,
+        "refreshConcurrency": 2,
+        "callsPerMinute": 6,
+        "foregroundReserveCallsPerMinute": 2,
+        "timeoutMs": 20000,
+        "sourceLagMs": 0,
+        "sourceTimestamp": "requestStart",
+        "missPolicy": "slow",
+        "failurePolicy": "serve-only-within-age",
+        "latencyTargetMs": 2000,
+        "finalDeadlineMs": 25000
+      },
+      "policyHash": "79af34ea5056eccbaa4be1ee20fd2f2ac0e7f02ea31f0bd589bd436a5ce07179",
+      "estimates": {
+        "usefulLatencyMs": 1000,
+        "liveLatencyMs": 15800,
+        "ageEnvelopeMs": 86000,
+        "callsPerMinute": 4,
+        "storageBytes": 8192,
+        "usableHitRate": 0.98,
+        "trafficSuccessRate": 0.9702,
+        "coldStartMs": 20000,
+        "costPerMinute": null
+      },
+      "metadataUnderstood": true,
+      "designEvaluated": true,
+      "executableHere": true,
+      "prerequisites": [],
+      "assumptions": [
+        "Latency sums are point estimates, not an end-to-end percentile.",
+        "Declared and synthetic facts need representative production validation.",
+        "Successful refreshes obey I + D + J + L + U ≤ maximum age; failures reduce usable coverage.",
+        "Half the typical change interval is a soft cadence heuristic, never a correctness guarantee.",
+        "Replay assumes successful bounded source calls, no restarts, and this exact pinned-key policy. It is synthetic, not an observed production hit rate."
+      ],
+      "tradeoffs": [
+        "Restart begins cold; cold, expired and unenumerated requests may miss the latency target.",
+        "An entry keeps its original source timestamp after failed refreshes.",
+        "Live revalidation is required before commitment. Booking and payment execution are outside the demo."
+      ],
+      "tasks": [
+        "Verify source cache permission, correctness, scope and all key dimensions.",
+        "Place a bounded exact-key cache between the existing caller and source.",
+        "Validate the response envelope and output schema; preserve source snapshot time and provenance.",
+        "Start the exported per-key schedule; reserve foreground quota and prevent overlap.",
+        "Coalesce fills per key; enforce age including delivery allowance on every read.",
+        "Integrate the explicit slow/target-unmet miss path and expose data age.",
+        "Keep live revalidation at commitment; never use indicative fares as booking confirmation.",
+        "Measure cold starts, usable coverage, complete-path latency, failures and restarts under representative traffic."
+      ]
+    },
+    {
+      "id": "scheduled-cache-aside",
+      "title": "Scheduled cache + miss filling",
+      "components": ["Exact-key cache", "Refresh scheduler", "Miss filling"],
+      "status": "feasible_under_declared_assumptions",
+      "criteria": [
+        {
+          "id": "metadata-version",
+          "verdict": "pass_under_assumptions",
+          "reason": "Metadata semantics are evaluated only for pinned protocol versions.",
+          "actual": null,
+          "required": null,
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "contract",
+          "verdict": "pass_under_assumptions",
+          "reason": "Explicit top-level input/output mappings and structured operation schemas are required. Nested conversions require an adapter.",
+          "actual": null,
+          "required": null,
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "interface",
+          "verdict": "pass_under_assumptions",
+          "reason": "Caller can invoke the exposed protocol and version.",
+          "actual": 0,
+          "required": "known adapter overhead",
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "semantics",
+          "verdict": "pass_under_assumptions",
+          "reason": "The operation must produce the requested useful output; names, progress acknowledgements and skill prose cannot establish equivalence.",
+          "actual": "indicative flight options",
+          "required": "indicative flight options",
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "read-only",
+          "verdict": "pass_under_assumptions",
+          "reason": "Only declared reads may enter a cache.",
+          "actual": "read",
+          "required": "read",
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "permission",
+          "verdict": "pass_under_assumptions",
+          "reason": "Both source permission and allowed infrastructure must permit caching.",
+          "actual": "true",
+          "required": "true",
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "correctness",
+          "verdict": "pass_under_assumptions",
+          "reason": "Cached indicative results cannot substitute for a required live result.",
+          "actual": "indicative",
+          "required": "indicative",
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "key-scope",
+          "verdict": "pass_under_assumptions",
+          "reason": "Every output-changing dimension and user/tenant identity must form the exact key.",
+          "actual": "public",
+          "required": "known complete scope",
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "age-bound",
+          "verdict": "pass_under_assumptions",
+          "reason": "Fetch duration, source lag and delivery allowance must fit the accepted result age.",
+          "actual": 21000,
+          "required": 90000,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "storage",
+          "verdict": "pass_under_assumptions",
+          "reason": "Pinned exact-key entries must fit cache capacity and memory.",
+          "actual": 8192,
+          "required": 1048576,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "scheduling",
+          "verdict": "pass_under_assumptions",
+          "reason": "The design introduces a scheduler and requires permission.",
+          "actual": null,
+          "required": null,
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "enumerable-keys",
+          "verdict": "pass_under_assumptions",
+          "reason": "Scheduled work requires explicitly enumerable exact keys.",
+          "actual": 2,
+          "required": "nonempty exact keys",
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "refresh-schedule",
+          "verdict": "pass_under_assumptions",
+          "reason": "Deterministic evenly spaced cyclic starts must meet age, per-key nonoverlap, quota and concurrency.",
+          "actual": 60000,
+          "required": "feasible interval",
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "latency-estimate",
+          "verdict": "pass_under_assumptions",
+          "reason": "Complete-path point estimate including adapter, agent, mapping, network and rendering.",
+          "actual": 1000,
+          "required": 2000,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "traffic-slo",
+          "verdict": "pass_under_assumptions",
+          "reason": "Usable-hit replay × separately supplied within-target hit fraction; hot-key share is only a ceiling.",
+          "actual": 0.9702,
+          "required": 0.95,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "quota",
+          "verdict": "pass_under_assumptions",
+          "reason": "Scheduled calls plus foreground/miss/live traffic must fit shared quota and call budget.",
+          "actual": 4,
+          "required": 6,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "concurrency-load",
+          "verdict": "pass_under_assumptions",
+          "reason": "Necessary mean load check; exact cyclic schedule and bounded source admission also apply.",
+          "actual": 1.3333333333333333,
+          "required": 2,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        }
+      ],
+      "diagram": "flowchart LR\n  A[Existing caller] --> C[Introduced exact-key cache]\n  C --> U[Indicative output + age]\n  S[Introduced scheduler] --> B[Existing slow source]\n  B --> C\n  C -. miss / expiry .-> B\n  U -. commitment .-> V[Live revalidation]",
+      "config": {
+        "formatVersion": "0.1-alpha.2",
+        "pattern": "scheduled-cache-aside",
+        "scope": "public",
+        "keyDimensions": [
+          "origin",
+          "destination",
+          "departureDate",
+          "returnDate",
+          "adults",
+          "children",
+          "infants",
+          "cabin",
+          "currency",
+          "locale",
+          "fareContext"
+        ],
+        "maxAgeMs": 90000,
+        "deliveryAllowanceMs": 1000,
+        "capacity": 2,
+        "maxBytes": 1048576,
+        "refreshIntervalMs": 60000,
+        "schedule": [
+          {
+            "key": {
+              "origin": "DEL",
+              "destination": "LHR",
+              "departureDate": "2026-12-15",
+              "returnDate": "2026-12-22",
+              "adults": 1,
+              "children": 0,
+              "infants": 0,
+              "cabin": "economy",
+              "currency": "INR",
+              "locale": "en-IN",
+              "fareContext": "public"
+            },
+            "offsetMs": 0
+          },
+          {
+            "key": {
+              "origin": "BOM",
+              "destination": "SIN",
+              "departureDate": "2026-12-15",
+              "returnDate": "2026-12-22",
+              "adults": 1,
+              "children": 0,
+              "infants": 0,
+              "cabin": "economy",
+              "currency": "INR",
+              "locale": "en-IN",
+              "fareContext": "public"
+            },
+            "offsetMs": 30000
+          }
+        ],
+        "prewarmKeys": [
+          {
+            "origin": "DEL",
+            "destination": "LHR",
+            "departureDate": "2026-12-15",
+            "returnDate": "2026-12-22",
+            "adults": 1,
+            "children": 0,
+            "infants": 0,
+            "cabin": "economy",
+            "currency": "INR",
+            "locale": "en-IN",
+            "fareContext": "public"
+          },
+          {
+            "origin": "BOM",
+            "destination": "SIN",
+            "departureDate": "2026-12-15",
+            "returnDate": "2026-12-22",
+            "adults": 1,
+            "children": 0,
+            "infants": 0,
+            "cabin": "economy",
+            "currency": "INR",
+            "locale": "en-IN",
+            "fareContext": "public"
+          }
+        ],
+        "concurrency": 2,
+        "refreshConcurrency": 2,
+        "callsPerMinute": 6,
+        "foregroundReserveCallsPerMinute": 2,
+        "timeoutMs": 20000,
+        "sourceLagMs": 0,
+        "sourceTimestamp": "requestStart",
+        "missPolicy": "slow",
+        "failurePolicy": "serve-only-within-age",
+        "latencyTargetMs": 2000,
+        "finalDeadlineMs": 25000
+      },
+      "policyHash": "8644e5277bdd9668ad62469fc63620430e8632355ff4a31bc844858d7a22bdff",
+      "estimates": {
+        "usefulLatencyMs": 1000,
+        "liveLatencyMs": 15800,
+        "ageEnvelopeMs": 86000,
+        "callsPerMinute": 4,
+        "storageBytes": 8192,
+        "usableHitRate": 0.98,
+        "trafficSuccessRate": 0.9702,
+        "coldStartMs": 20000,
+        "costPerMinute": null
+      },
+      "metadataUnderstood": true,
+      "designEvaluated": true,
+      "executableHere": true,
+      "prerequisites": [],
+      "assumptions": [
+        "Latency sums are point estimates, not an end-to-end percentile.",
+        "Declared and synthetic facts need representative production validation.",
+        "Successful refreshes obey I + D + J + L + U ≤ maximum age; failures reduce usable coverage.",
+        "Half the typical change interval is a soft cadence heuristic, never a correctness guarantee.",
+        "Replay assumes successful bounded source calls, no restarts, and this exact pinned-key policy. It is synthetic, not an observed production hit rate."
+      ],
+      "tradeoffs": [
+        "Restart begins cold; cold, expired and unenumerated requests may miss the latency target.",
+        "An entry keeps its original source timestamp after failed refreshes.",
+        "Live revalidation is required before commitment. Booking and payment execution are outside the demo."
+      ],
+      "tasks": [
+        "Verify source cache permission, correctness, scope and all key dimensions.",
+        "Place a bounded exact-key cache between the existing caller and source.",
+        "Validate the response envelope and output schema; preserve source snapshot time and provenance.",
+        "Start the exported per-key schedule; reserve foreground quota and prevent overlap.",
+        "Coalesce fills per key; enforce age including delivery allowance on every read.",
+        "Integrate the explicit slow/target-unmet miss path and expose data age.",
+        "Keep live revalidation at commitment; never use indicative fares as booking confirmation.",
+        "Measure cold starts, usable coverage, complete-path latency, failures and restarts under representative traffic."
+      ]
+    },
+    {
+      "id": "direct",
+      "title": "Direct request",
+      "components": [],
+      "status": "infeasible",
+      "criteria": [
+        {
+          "id": "metadata-version",
+          "verdict": "pass_under_assumptions",
+          "reason": "Metadata semantics are evaluated only for pinned protocol versions.",
+          "actual": null,
+          "required": null,
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "contract",
+          "verdict": "pass_under_assumptions",
+          "reason": "Explicit top-level input/output mappings and structured operation schemas are required. Nested conversions require an adapter.",
+          "actual": null,
+          "required": null,
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "interface",
+          "verdict": "pass_under_assumptions",
+          "reason": "Caller can invoke the exposed protocol and version.",
+          "actual": 0,
+          "required": "known adapter overhead",
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "semantics",
+          "verdict": "pass_under_assumptions",
+          "reason": "The operation must produce the requested useful output; names, progress acknowledgements and skill prose cannot establish equivalence.",
+          "actual": "indicative flight options",
+          "required": "indicative flight options",
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "latency-estimate",
+          "verdict": "fail",
+          "reason": "Complete-path point estimate including adapter, agent, mapping, network and rendering.",
+          "actual": 15800,
+          "required": 2000,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "complete-path-slo",
+          "verdict": "fail",
+          "reason": "Require independent end-to-end evidence at this target; component sums do not establish a percentile or every-request bound.",
+          "actual": null,
+          "required": 0.95,
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "quota",
+          "verdict": "fail",
+          "reason": "Scheduled calls plus foreground/miss/live traffic must fit shared quota and call budget.",
+          "actual": 50,
+          "required": 6,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "concurrency-load",
+          "verdict": "fail",
+          "reason": "Necessary mean load check; exact cyclic schedule and bounded source admission also apply.",
+          "actual": 16.666666666666668,
+          "required": 2,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        }
+      ],
+      "diagram": "flowchart LR\n  A[Existing caller] --> B[Existing source]\n  B --> U[Useful output]",
+      "config": {
+        "formatVersion": "0.1-alpha.2",
+        "pattern": "direct",
+        "scope": "public",
+        "keyDimensions": [
+          "origin",
+          "destination",
+          "departureDate",
+          "returnDate",
+          "adults",
+          "children",
+          "infants",
+          "cabin",
+          "currency",
+          "locale",
+          "fareContext"
+        ],
+        "maxAgeMs": 90000,
+        "deliveryAllowanceMs": 1000,
+        "capacity": 2,
+        "maxBytes": 1048576,
+        "refreshIntervalMs": null,
+        "schedule": [],
+        "prewarmKeys": [
+          {
+            "origin": "DEL",
+            "destination": "LHR",
+            "departureDate": "2026-12-15",
+            "returnDate": "2026-12-22",
+            "adults": 1,
+            "children": 0,
+            "infants": 0,
+            "cabin": "economy",
+            "currency": "INR",
+            "locale": "en-IN",
+            "fareContext": "public"
+          },
+          {
+            "origin": "BOM",
+            "destination": "SIN",
+            "departureDate": "2026-12-15",
+            "returnDate": "2026-12-22",
+            "adults": 1,
+            "children": 0,
+            "infants": 0,
+            "cabin": "economy",
+            "currency": "INR",
+            "locale": "en-IN",
+            "fareContext": "public"
+          }
+        ],
+        "concurrency": 2,
+        "refreshConcurrency": 2,
+        "callsPerMinute": 6,
+        "foregroundReserveCallsPerMinute": 2,
+        "timeoutMs": 20000,
+        "sourceLagMs": 0,
+        "sourceTimestamp": "requestStart",
+        "missPolicy": "slow",
+        "failurePolicy": "serve-only-within-age",
+        "latencyTargetMs": 2000,
+        "finalDeadlineMs": 25000
+      },
+      "policyHash": "7af26dd6931ac766660dc7f61560de363eff19aa00dee8e97b5ce3f1c6656e51",
+      "estimates": {
+        "usefulLatencyMs": 15800,
+        "liveLatencyMs": 15800,
+        "ageEnvelopeMs": null,
+        "callsPerMinute": 50,
+        "storageBytes": null,
+        "usableHitRate": null,
+        "trafficSuccessRate": null,
+        "coldStartMs": 20000,
+        "costPerMinute": null
+      },
+      "metadataUnderstood": true,
+      "designEvaluated": true,
+      "executableHere": true,
+      "prerequisites": [],
+      "assumptions": [
+        "Latency sums are point estimates, not an end-to-end percentile.",
+        "Declared and synthetic facts need representative production validation."
+      ],
+      "tradeoffs": [],
+      "tasks": [
+        "Connect the mapped operations through the stated interface/adapter.",
+        "Validate outputs, enforce timeout/cancellation, and measure the complete path."
+      ]
+    },
+    {
+      "id": "cache-aside",
+      "title": "Cache-aside",
+      "components": ["Exact-key cache"],
+      "status": "infeasible",
+      "criteria": [
+        {
+          "id": "metadata-version",
+          "verdict": "pass_under_assumptions",
+          "reason": "Metadata semantics are evaluated only for pinned protocol versions.",
+          "actual": null,
+          "required": null,
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "contract",
+          "verdict": "pass_under_assumptions",
+          "reason": "Explicit top-level input/output mappings and structured operation schemas are required. Nested conversions require an adapter.",
+          "actual": null,
+          "required": null,
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "interface",
+          "verdict": "pass_under_assumptions",
+          "reason": "Caller can invoke the exposed protocol and version.",
+          "actual": 0,
+          "required": "known adapter overhead",
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "semantics",
+          "verdict": "pass_under_assumptions",
+          "reason": "The operation must produce the requested useful output; names, progress acknowledgements and skill prose cannot establish equivalence.",
+          "actual": "indicative flight options",
+          "required": "indicative flight options",
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "read-only",
+          "verdict": "pass_under_assumptions",
+          "reason": "Only declared reads may enter a cache.",
+          "actual": "read",
+          "required": "read",
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "permission",
+          "verdict": "pass_under_assumptions",
+          "reason": "Both source permission and allowed infrastructure must permit caching.",
+          "actual": "true",
+          "required": "true",
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "correctness",
+          "verdict": "pass_under_assumptions",
+          "reason": "Cached indicative results cannot substitute for a required live result.",
+          "actual": "indicative",
+          "required": "indicative",
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "key-scope",
+          "verdict": "pass_under_assumptions",
+          "reason": "Every output-changing dimension and user/tenant identity must form the exact key.",
+          "actual": "public",
+          "required": "known complete scope",
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "age-bound",
+          "verdict": "pass_under_assumptions",
+          "reason": "Fetch duration, source lag and delivery allowance must fit the accepted result age.",
+          "actual": 21000,
+          "required": 90000,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "storage",
+          "verdict": "pass_under_assumptions",
+          "reason": "Pinned exact-key entries must fit cache capacity and memory.",
+          "actual": 8192,
+          "required": 1048576,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "latency-estimate",
+          "verdict": "pass_under_assumptions",
+          "reason": "Complete-path point estimate including adapter, agent, mapping, network and rendering.",
+          "actual": 1000,
+          "required": 2000,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "traffic-slo",
+          "verdict": "fail",
+          "reason": "Usable-hit replay × separately supplied within-target hit fraction; hot-key share is only a ceiling.",
+          "actual": 0.71082,
+          "required": 0.95,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "quota",
+          "verdict": "fail",
+          "reason": "Scheduled calls plus foreground/miss/live traffic must fit shared quota and call budget.",
+          "actual": 14.100000000000001,
+          "required": 6,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "concurrency-load",
+          "verdict": "fail",
+          "reason": "Necessary mean load check; exact cyclic schedule and bounded source admission also apply.",
+          "actual": 4.7,
+          "required": 2,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        }
+      ],
+      "diagram": "flowchart LR\n  A[Existing caller] --> C[Introduced exact-key cache]\n  C --> U[Eligible output + age]\n  C -. miss / live refresh .-> B[Existing source]\n  B --> C",
+      "config": {
+        "formatVersion": "0.1-alpha.2",
+        "pattern": "cache-aside",
+        "scope": "public",
+        "keyDimensions": [
+          "origin",
+          "destination",
+          "departureDate",
+          "returnDate",
+          "adults",
+          "children",
+          "infants",
+          "cabin",
+          "currency",
+          "locale",
+          "fareContext"
+        ],
+        "maxAgeMs": 90000,
+        "deliveryAllowanceMs": 1000,
+        "capacity": 2,
+        "maxBytes": 1048576,
+        "refreshIntervalMs": null,
+        "schedule": [],
+        "prewarmKeys": [
+          {
+            "origin": "DEL",
+            "destination": "LHR",
+            "departureDate": "2026-12-15",
+            "returnDate": "2026-12-22",
+            "adults": 1,
+            "children": 0,
+            "infants": 0,
+            "cabin": "economy",
+            "currency": "INR",
+            "locale": "en-IN",
+            "fareContext": "public"
+          },
+          {
+            "origin": "BOM",
+            "destination": "SIN",
+            "departureDate": "2026-12-15",
+            "returnDate": "2026-12-22",
+            "adults": 1,
+            "children": 0,
+            "infants": 0,
+            "cabin": "economy",
+            "currency": "INR",
+            "locale": "en-IN",
+            "fareContext": "public"
+          }
+        ],
+        "concurrency": 2,
+        "refreshConcurrency": 2,
+        "callsPerMinute": 6,
+        "foregroundReserveCallsPerMinute": 2,
+        "timeoutMs": 20000,
+        "sourceLagMs": 0,
+        "sourceTimestamp": "requestStart",
+        "missPolicy": "slow",
+        "failurePolicy": "serve-only-within-age",
+        "latencyTargetMs": 2000,
+        "finalDeadlineMs": 25000
+      },
+      "policyHash": "8414df1c3caba816e158fb23e5a9370da3810a50feafe5140ab8629f5b2d8b7c",
+      "estimates": {
+        "usefulLatencyMs": 1000,
+        "liveLatencyMs": 15800,
+        "ageEnvelopeMs": null,
+        "callsPerMinute": 14.100000000000001,
+        "storageBytes": 8192,
+        "usableHitRate": 0.718,
+        "trafficSuccessRate": 0.71082,
+        "coldStartMs": 20000,
+        "costPerMinute": null
+      },
+      "metadataUnderstood": true,
+      "designEvaluated": true,
+      "executableHere": true,
+      "prerequisites": [],
+      "assumptions": [
+        "Latency sums are point estimates, not an end-to-end percentile.",
+        "Declared and synthetic facts need representative production validation.",
+        "Replay assumes successful bounded source calls, no restarts, and this exact pinned-key policy. It is synthetic, not an observed production hit rate."
+      ],
+      "tradeoffs": [
+        "Restart begins cold; cold, expired and unenumerated requests may miss the latency target.",
+        "An entry keeps its original source timestamp after failed refreshes.",
+        "Live revalidation is required before commitment. Booking and payment execution are outside the demo."
+      ],
+      "tasks": [
+        "Verify source cache permission, correctness, scope and all key dimensions.",
+        "Place a bounded exact-key cache between the existing caller and source.",
+        "Validate the response envelope and output schema; preserve source snapshot time and provenance.",
+        "Coalesce fills per key; enforce age including delivery allowance on every read.",
+        "Integrate the explicit slow/target-unmet miss path and expose data age.",
+        "Keep live revalidation at commitment; never use indicative fares as booking confirmation.",
+        "Measure cold starts, usable coverage, complete-path latency, failures and restarts under representative traffic."
+      ]
+    },
+    {
+      "id": "progressive",
+      "title": "Useful initial output + deferred live result",
+      "components": ["Progressive delivery"],
+      "status": "infeasible",
+      "criteria": [
+        {
+          "id": "metadata-version",
+          "verdict": "pass_under_assumptions",
+          "reason": "Metadata semantics are evaluated only for pinned protocol versions.",
+          "actual": null,
+          "required": null,
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "contract",
+          "verdict": "pass_under_assumptions",
+          "reason": "Explicit top-level input/output mappings and structured operation schemas are required. Nested conversions require an adapter.",
+          "actual": null,
+          "required": null,
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "interface",
+          "verdict": "pass_under_assumptions",
+          "reason": "Caller can invoke the exposed protocol and version.",
+          "actual": 0,
+          "required": "known adapter overhead",
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "semantics",
+          "verdict": "unknown",
+          "reason": "The operation must produce the requested useful output; names, progress acknowledgements and skill prose cannot establish equivalence.",
+          "actual": null,
+          "required": "indicative flight options",
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "deferred",
+          "verdict": "fail",
+          "reason": "The experience must permit a useful initial result followed by a live result.",
+          "actual": null,
+          "required": null,
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "final-deadline",
+          "verdict": "pass_under_assumptions",
+          "reason": "Live completion must fit the declared final deadline (point estimate).",
+          "actual": 15800,
+          "required": 25000,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "initial-useful",
+          "verdict": "unknown",
+          "reason": "An identified initial output must itself satisfy the useful-output requirement. A spinner is insufficient.",
+          "actual": null,
+          "required": "indicative flight options",
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "latency-estimate",
+          "verdict": "unknown",
+          "reason": "Complete-path point estimate including adapter, agent, mapping, network and rendering.",
+          "actual": null,
+          "required": 2000,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "complete-path-slo",
+          "verdict": "unknown",
+          "reason": "Require independent end-to-end evidence at this target; component sums do not establish a percentile or every-request bound.",
+          "actual": null,
+          "required": 0.95,
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "quota",
+          "verdict": "fail",
+          "reason": "Scheduled calls plus foreground/miss/live traffic must fit shared quota and call budget.",
+          "actual": 50,
+          "required": 6,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "concurrency-load",
+          "verdict": "fail",
+          "reason": "Necessary mean load check; exact cyclic schedule and bounded source admission also apply.",
+          "actual": 16.666666666666668,
+          "required": 2,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        }
+      ],
+      "diagram": "flowchart LR\n  A[Existing caller] --> I[Useful initial output]\n  A --> B[Existing source]\n  B --> F[Later live result]",
+      "config": {
+        "formatVersion": "0.1-alpha.2",
+        "pattern": "progressive",
+        "scope": "public",
+        "keyDimensions": [
+          "origin",
+          "destination",
+          "departureDate",
+          "returnDate",
+          "adults",
+          "children",
+          "infants",
+          "cabin",
+          "currency",
+          "locale",
+          "fareContext"
+        ],
+        "maxAgeMs": 90000,
+        "deliveryAllowanceMs": 1000,
+        "capacity": 2,
+        "maxBytes": 1048576,
+        "refreshIntervalMs": null,
+        "schedule": [],
+        "prewarmKeys": [
+          {
+            "origin": "DEL",
+            "destination": "LHR",
+            "departureDate": "2026-12-15",
+            "returnDate": "2026-12-22",
+            "adults": 1,
+            "children": 0,
+            "infants": 0,
+            "cabin": "economy",
+            "currency": "INR",
+            "locale": "en-IN",
+            "fareContext": "public"
+          },
+          {
+            "origin": "BOM",
+            "destination": "SIN",
+            "departureDate": "2026-12-15",
+            "returnDate": "2026-12-22",
+            "adults": 1,
+            "children": 0,
+            "infants": 0,
+            "cabin": "economy",
+            "currency": "INR",
+            "locale": "en-IN",
+            "fareContext": "public"
+          }
+        ],
+        "concurrency": 2,
+        "refreshConcurrency": 2,
+        "callsPerMinute": 6,
+        "foregroundReserveCallsPerMinute": 2,
+        "timeoutMs": 20000,
+        "sourceLagMs": 0,
+        "sourceTimestamp": "requestStart",
+        "missPolicy": "slow",
+        "failurePolicy": "serve-only-within-age",
+        "latencyTargetMs": 2000,
+        "finalDeadlineMs": 25000
+      },
+      "policyHash": "38aa946d9c5340b621f3930bd93060e0da495a974ab36f28645bd4f35d86d0f1",
+      "estimates": {
+        "usefulLatencyMs": null,
+        "liveLatencyMs": 15800,
+        "ageEnvelopeMs": null,
+        "callsPerMinute": 50,
+        "storageBytes": null,
+        "usableHitRate": null,
+        "trafficSuccessRate": null,
+        "coldStartMs": 20000,
+        "costPerMinute": null
+      },
+      "metadataUnderstood": true,
+      "designEvaluated": true,
+      "executableHere": false,
+      "prerequisites": [
+        "The operation must produce the requested useful output; names, progress acknowledgements and skill prose cannot establish equivalence.",
+        "An identified initial output must itself satisfy the useful-output requirement. A spinner is insufficient.",
+        "Complete-path point estimate including adapter, agent, mapping, network and rendering.",
+        "Require independent end-to-end evidence at this target; component sums do not establish a percentile or every-request bound."
+      ],
+      "assumptions": [
+        "Latency sums are point estimates, not an end-to-end percentile.",
+        "Declared and synthetic facts need representative production validation."
+      ],
+      "tradeoffs": [],
+      "tasks": [
+        "Connect the mapped operations through the stated interface/adapter.",
+        "Implement the identified useful initial output and final deadline.",
+        "Validate outputs, enforce timeout/cancellation, and measure the complete path."
+      ]
+    },
+    {
+      "id": "cached-live",
+      "title": "Cached initial output + live refresh",
+      "components": ["Exact-key cache", "Progressive delivery"],
+      "status": "infeasible",
+      "criteria": [
+        {
+          "id": "metadata-version",
+          "verdict": "pass_under_assumptions",
+          "reason": "Metadata semantics are evaluated only for pinned protocol versions.",
+          "actual": null,
+          "required": null,
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "contract",
+          "verdict": "pass_under_assumptions",
+          "reason": "Explicit top-level input/output mappings and structured operation schemas are required. Nested conversions require an adapter.",
+          "actual": null,
+          "required": null,
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "interface",
+          "verdict": "pass_under_assumptions",
+          "reason": "Caller can invoke the exposed protocol and version.",
+          "actual": 0,
+          "required": "known adapter overhead",
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "semantics",
+          "verdict": "pass_under_assumptions",
+          "reason": "The operation must produce the requested useful output; names, progress acknowledgements and skill prose cannot establish equivalence.",
+          "actual": "indicative flight options",
+          "required": "indicative flight options",
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "read-only",
+          "verdict": "pass_under_assumptions",
+          "reason": "Only declared reads may enter a cache.",
+          "actual": "read",
+          "required": "read",
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "permission",
+          "verdict": "pass_under_assumptions",
+          "reason": "Both source permission and allowed infrastructure must permit caching.",
+          "actual": "true",
+          "required": "true",
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "correctness",
+          "verdict": "pass_under_assumptions",
+          "reason": "Cached indicative results cannot substitute for a required live result.",
+          "actual": "indicative",
+          "required": "indicative",
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "key-scope",
+          "verdict": "pass_under_assumptions",
+          "reason": "Every output-changing dimension and user/tenant identity must form the exact key.",
+          "actual": "public",
+          "required": "known complete scope",
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "age-bound",
+          "verdict": "pass_under_assumptions",
+          "reason": "Fetch duration, source lag and delivery allowance must fit the accepted result age.",
+          "actual": 21000,
+          "required": 90000,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "storage",
+          "verdict": "pass_under_assumptions",
+          "reason": "Pinned exact-key entries must fit cache capacity and memory.",
+          "actual": 8192,
+          "required": 1048576,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "deferred",
+          "verdict": "fail",
+          "reason": "The experience must permit a useful initial result followed by a live result.",
+          "actual": null,
+          "required": null,
+          "evidence": [
+            {
+              "kind": "unknown",
+              "note": "Not supplied; no guarantee inferred."
+            }
+          ]
+        },
+        {
+          "id": "final-deadline",
+          "verdict": "pass_under_assumptions",
+          "reason": "Live completion must fit the declared final deadline (point estimate).",
+          "actual": 15800,
+          "required": 25000,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "latency-estimate",
+          "verdict": "pass_under_assumptions",
+          "reason": "Complete-path point estimate including adapter, agent, mapping, network and rendering.",
+          "actual": 1000,
+          "required": 2000,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "traffic-slo",
+          "verdict": "fail",
+          "reason": "Usable-hit replay × separately supplied within-target hit fraction; hot-key share is only a ceiling.",
+          "actual": 0.93456,
+          "required": 0.95,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "quota",
+          "verdict": "fail",
+          "reason": "Scheduled calls plus foreground/miss/live traffic must fit shared quota and call budget.",
+          "actual": 50,
+          "required": 6,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        },
+        {
+          "id": "concurrency-load",
+          "verdict": "fail",
+          "reason": "Necessary mean load check; exact cyclic schedule and bounded source admission also apply.",
+          "actual": 16.666666666666668,
+          "required": 2,
+          "evidence": [
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            },
+            {
+              "kind": "synthetic",
+              "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+              "sampleSize": 500,
+              "windowMs": 600000,
+              "measuredAt": "2026-10-04"
+            }
+          ]
+        }
+      ],
+      "diagram": "flowchart LR\n  A[Existing caller] --> C[Introduced exact-key cache]\n  C --> U[Eligible output + age]\n  C -. miss / live refresh .-> B[Existing source]\n  B --> C",
+      "config": {
+        "formatVersion": "0.1-alpha.2",
+        "pattern": "cached-live",
+        "scope": "public",
+        "keyDimensions": [
+          "origin",
+          "destination",
+          "departureDate",
+          "returnDate",
+          "adults",
+          "children",
+          "infants",
+          "cabin",
+          "currency",
+          "locale",
+          "fareContext"
+        ],
+        "maxAgeMs": 90000,
+        "deliveryAllowanceMs": 1000,
+        "capacity": 2,
+        "maxBytes": 1048576,
+        "refreshIntervalMs": null,
+        "schedule": [],
+        "prewarmKeys": [
+          {
+            "origin": "DEL",
+            "destination": "LHR",
+            "departureDate": "2026-12-15",
+            "returnDate": "2026-12-22",
+            "adults": 1,
+            "children": 0,
+            "infants": 0,
+            "cabin": "economy",
+            "currency": "INR",
+            "locale": "en-IN",
+            "fareContext": "public"
+          },
+          {
+            "origin": "BOM",
+            "destination": "SIN",
+            "departureDate": "2026-12-15",
+            "returnDate": "2026-12-22",
+            "adults": 1,
+            "children": 0,
+            "infants": 0,
+            "cabin": "economy",
+            "currency": "INR",
+            "locale": "en-IN",
+            "fareContext": "public"
+          }
+        ],
+        "concurrency": 2,
+        "refreshConcurrency": 2,
+        "callsPerMinute": 6,
+        "foregroundReserveCallsPerMinute": 2,
+        "timeoutMs": 20000,
+        "sourceLagMs": 0,
+        "sourceTimestamp": "requestStart",
+        "missPolicy": "slow",
+        "failurePolicy": "serve-only-within-age",
+        "latencyTargetMs": 2000,
+        "finalDeadlineMs": 25000
+      },
+      "policyHash": "87d6b8082acbd4836b6b048f90671246bf7f04c24e5b85be87b16920da0b5efe",
+      "estimates": {
+        "usefulLatencyMs": 1000,
+        "liveLatencyMs": 15800,
+        "ageEnvelopeMs": null,
+        "callsPerMinute": 50,
+        "storageBytes": 8192,
+        "usableHitRate": 0.944,
+        "trafficSuccessRate": 0.93456,
+        "coldStartMs": 20000,
+        "costPerMinute": null
+      },
+      "metadataUnderstood": true,
+      "designEvaluated": true,
+      "executableHere": false,
+      "prerequisites": [],
+      "assumptions": [
+        "Latency sums are point estimates, not an end-to-end percentile.",
+        "Declared and synthetic facts need representative production validation.",
+        "Replay assumes successful bounded source calls, no restarts, and this exact pinned-key policy. It is synthetic, not an observed production hit rate."
+      ],
+      "tradeoffs": [
+        "Restart begins cold; cold, expired and unenumerated requests may miss the latency target.",
+        "An entry keeps its original source timestamp after failed refreshes.",
+        "Live revalidation is required before commitment. Booking and payment execution are outside the demo."
+      ],
+      "tasks": [
+        "Verify source cache permission, correctness, scope and all key dimensions.",
+        "Place a bounded exact-key cache between the existing caller and source.",
+        "Validate the response envelope and output schema; preserve source snapshot time and provenance.",
+        "Coalesce fills per key; enforce age including delivery allowance on every read.",
+        "Integrate the explicit slow/target-unmet miss path and expose data age.",
+        "Deliver eligible initial options, then live refresh before the final deadline.",
+        "Keep live revalidation at commitment; never use indicative fares as booking confirmation.",
+        "Measure cold starts, usable coverage, complete-path latency, failures and restarts under representative traffic."
+      ]
+    }
+  ],
+  "missingInformation": [],
+  "costRankingAvailable": false,
+  "designHash": "0208b69c5676dd668ccc1536bfed07959a876848e085fc7929a1608b7e619291"
+}

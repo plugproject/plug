@@ -1,0 +1,20 @@
+---
+title: Flight search proof
+---
+
+The only source takes 15,000 ms and has a 20,000 ms hard timeout. Data is synthetic,
+public and indicative. Two complete queries cover 98% of the supplied synthetic
+500-request trace; all dimensions include route, dates, passenger composition,
+cabin, currency, locale and fare context. An independent synthetic assumption says
+99% of eligible hits meet the complete-path target. These are not production facts.
+
+The estimate is 200 ms cache lookup plus 800 ms unimplemented remaining overhead.
+Delivery age reserves a separate bounded 1,000 ms. With maximum age 90,000 ms,
+5,000 ms scheduling allowance and zero source lag, cadence may be at most 64,000 ms;
+the catalog chooses 60,000 ms. Two keys need two scheduled calls/minute, plus the
+foreground reserve, within six calls/minute and two simultaneous calls.
+
+Live-required under two seconds fails. Age five seconds fails. Unknown scope blocks
+shared caching. Cache-aside replays its own cold/expiry/refill gaps. Failed refreshes
+retain old timestamps; old entries stop being eligible. Demo measurements show HTTP
+or cache-path time only, never an inferred production agent p95.

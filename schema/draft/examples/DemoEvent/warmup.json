@@ -1,0 +1,6 @@
+{
+  "formatVersion": "0.1-alpha.2",
+  "type": "warmup",
+  "atMs": 1000,
+  "message": "Empty cache; real HTTP prewarming begins."
+}

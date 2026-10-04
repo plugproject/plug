@@ -1,0 +1,13 @@
+---
+title: Required experience
+---
+
+The author specifies useful output, latency target, accepted age, correctness,
+latency scope, indicative-result permission, deferred-result permission, final
+deadline and allowed miss behavior. Latency scope is warmHits, trafficPercentile
+or everyRequest. Cache hits cannot certify every request because cold/expired
+states exist. A live requirement cannot be silently weakened to indicative output.
+
+Traffic success is bounded by usable hits times independently evidenced within-target
+hit probability when misses are slow. Summing point estimates or percentiles does
+not establish that probability. Missing evidence remains a conditional claim.

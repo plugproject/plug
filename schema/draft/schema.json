@@ -1,0 +1,1489 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "FormatVersion": {
+      "type": "string",
+      "const": "0.1-alpha.2",
+      "description": "Plug alpha public serialized contracts. Replaces the earlier alpha draft."
+    },
+    "Quantity": {
+      "type": "number",
+      "description": "Nonnegative, bounded finite measurement in the field's documented units.",
+      "minimum": 0,
+      "maximum": 1000000000000000
+    },
+    "Fraction": {
+      "type": "number",
+      "description": "A probability, never a percentage in the 0–100 range.",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "JsonValue": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/JsonValue"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/JsonValue"
+          }
+        }
+      ]
+    },
+    "JsonObject": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/JsonValue"
+      }
+    },
+    "Evidence": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "declared",
+            "observed",
+            "synthetic",
+            "unknown"
+          ]
+        },
+        "note": {
+          "type": "string"
+        },
+        "measuredAt": {
+          "type": "string"
+        },
+        "sampleSize": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "windowMs": {
+          "$ref": "#/definitions/Quantity"
+        }
+      },
+      "required": [
+        "kind",
+        "note"
+      ],
+      "additionalProperties": false,
+      "description": "Each operational fact carries provenance; unknown values must be null."
+    },
+    "Fact": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Quantity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidence": {
+          "$ref": "#/definitions/Evidence"
+        }
+      },
+      "required": [
+        "value",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "RateFact": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Fraction"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidence": {
+          "$ref": "#/definitions/Evidence"
+        }
+      },
+      "required": [
+        "value",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "Interface": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "protocol": {
+          "type": "string",
+          "enum": [
+            "http",
+            "mcp",
+            "a2a"
+          ]
+        },
+        "version": {
+          "type": "string"
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "exposes",
+            "calls"
+          ]
+        },
+        "binding": {
+          "type": "string"
+        },
+        "endpoint": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "protocol",
+        "version",
+        "direction",
+        "binding"
+      ],
+      "additionalProperties": false
+    },
+    "Semantics": {
+      "type": "object",
+      "properties": {
+        "effect": {
+          "type": "string",
+          "enum": [
+            "read",
+            "write",
+            "unknown"
+          ]
+        },
+        "idempotent": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "outputMeaning": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cachePermission": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "public",
+            "user",
+            "tenant",
+            "unknown"
+          ]
+        },
+        "keyDimensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "All output-changing dimensions, including identity where scoped."
+        },
+        "keysComplete": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "requiresLiveValidation": {
+          "type": "boolean"
+        },
+        "evidence": {
+          "$ref": "#/definitions/Evidence"
+        }
+      },
+      "required": [
+        "effect",
+        "idempotent",
+        "outputMeaning",
+        "cachePermission",
+        "scope",
+        "keyDimensions",
+        "keysComplete",
+        "requiresLiveValidation",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "Operation": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "interfaceId": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "inputSchema": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/JsonObject"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "outputSchema": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/JsonObject"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "semantics": {
+          "$ref": "#/definitions/Semantics"
+        },
+        "metadata": {
+          "$ref": "#/definitions/JsonObject"
+        }
+      },
+      "required": [
+        "id",
+        "interfaceId",
+        "description",
+        "inputSchema",
+        "outputSchema",
+        "semantics"
+      ],
+      "additionalProperties": false
+    },
+    "SystemDescription": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "interfaces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Interface"
+          }
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Operation"
+          },
+          "description": "Alpha accepts up to four selected operations per system.",
+          "maxItems": 4,
+          "minItems": 1
+        },
+        "metadata": {
+          "$ref": "#/definitions/JsonObject"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "role",
+        "interfaces",
+        "operations"
+      ],
+      "additionalProperties": false
+    },
+    "SystemProfile": {
+      "type": "object",
+      "properties": {
+        "systemId": {
+          "type": "string"
+        },
+        "operationId": {
+          "type": "string"
+        },
+        "latencyMs": {
+          "$ref": "#/definitions/Fact"
+        },
+        "latencyPercentile": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Fraction"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "timeoutMs": {
+          "$ref": "#/definitions/Fact",
+          "description": "Hard completion bound, not p95."
+        },
+        "callsPerMinute": {
+          "$ref": "#/definitions/Fact"
+        },
+        "concurrency": {
+          "$ref": "#/definitions/Fact"
+        },
+        "responseBytes": {
+          "$ref": "#/definitions/Fact"
+        },
+        "callCost": {
+          "$ref": "#/definitions/Fact"
+        },
+        "changeIntervalMs": {
+          "$ref": "#/definitions/Fact"
+        },
+        "sourceTimestamp": {
+          "type": "string",
+          "enum": [
+            "requestStart",
+            "responseSnapshot",
+            "observationOnly",
+            "unknown"
+          ]
+        },
+        "sourceLagMs": {
+          "$ref": "#/definitions/Fact"
+        },
+        "invalidation": {
+          "type": "string",
+          "enum": [
+            "none",
+            "unknown",
+            "available"
+          ]
+        }
+      },
+      "required": [
+        "systemId",
+        "operationId",
+        "latencyMs",
+        "latencyPercentile",
+        "timeoutMs",
+        "callsPerMinute",
+        "concurrency",
+        "responseBytes",
+        "callCost",
+        "changeIntervalMs",
+        "sourceTimestamp",
+        "sourceLagMs",
+        "invalidation"
+      ],
+      "additionalProperties": false
+    },
+    "ExactKey": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "number",
+          "boolean"
+        ]
+      }
+    },
+    "TraceRequest": {
+      "type": "object",
+      "properties": {
+        "atMs": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "key": {
+          "$ref": "#/definitions/ExactKey"
+        }
+      },
+      "required": [
+        "atMs",
+        "key"
+      ],
+      "additionalProperties": false
+    },
+    "Workload": {
+      "type": "object",
+      "properties": {
+        "requestsPerMinute": {
+          "$ref": "#/definitions/Fact"
+        },
+        "hotKeyShare": {
+          "$ref": "#/definitions/RateFact"
+        },
+        "prewarmKeys": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/ExactKey"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "keyCount": {
+          "$ref": "#/definitions/Fact"
+        },
+        "trace": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/TraceRequest"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Bounded ordered trace; replay starts cold at time zero.",
+          "maxItems": 2000
+        },
+        "traceEvidence": {
+          "$ref": "#/definitions/Evidence"
+        },
+        "measurementStartMs": {
+          "$ref": "#/definitions/Quantity",
+          "description": "Count only requests at/after this time; warmup remains visible in the report."
+        },
+        "usableHitObservation": {
+          "type": "object",
+          "properties": {
+            "policyHash": {
+              "type": "string"
+            },
+            "hitRate": {
+              "$ref": "#/definitions/RateFact"
+            }
+          },
+          "required": [
+            "policyHash",
+            "hitRate"
+          ],
+          "additionalProperties": false,
+          "description": "Matching observations bind to the exact policy fingerprint."
+        }
+      },
+      "required": [
+        "requestsPerMinute",
+        "hotKeyShare",
+        "prewarmKeys",
+        "keyCount",
+        "trace",
+        "traceEvidence",
+        "measurementStartMs"
+      ],
+      "additionalProperties": false
+    },
+    "Experience": {
+      "type": "object",
+      "properties": {
+        "usefulOutput": {
+          "type": "string"
+        },
+        "latencyTargetMs": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "warmHits",
+            "trafficPercentile",
+            "everyRequest"
+          ]
+        },
+        "targetPercentile": {
+          "$ref": "#/definitions/Fraction"
+        },
+        "maxAgeMs": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Quantity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "correctness": {
+          "type": "string",
+          "enum": [
+            "indicative",
+            "live"
+          ]
+        },
+        "allowIndicative": {
+          "type": "boolean"
+        },
+        "allowDeferred": {
+          "type": "boolean"
+        },
+        "allowSlowMiss": {
+          "type": "boolean"
+        },
+        "finalDeadlineMs": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Quantity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hitsWithinTarget": {
+          "$ref": "#/definitions/RateFact",
+          "description": "Independently justified complete-path probability for hits."
+        },
+        "hitsWithinTargetMs": {
+          "$ref": "#/definitions/Quantity",
+          "description": "Latency threshold to which the hit probability evidence applies."
+        },
+        "directWithinTarget": {
+          "type": "object",
+          "properties": {
+            "thresholdMs": {
+              "$ref": "#/definitions/Quantity"
+            },
+            "fraction": {
+              "$ref": "#/definitions/RateFact"
+            }
+          },
+          "required": [
+            "thresholdMs",
+            "fraction"
+          ],
+          "additionalProperties": false,
+          "description": "Optional complete-path evidence for direct calls at the specified threshold."
+        },
+        "completePathBoundMs": {
+          "$ref": "#/definitions/Fact",
+          "description": "Independently declared complete-path hard bound for everyRequest."
+        },
+        "initialOutput": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "meaning": {
+                  "type": "string"
+                },
+                "latencyMs": {
+                  "$ref": "#/definitions/Fact"
+                },
+                "useful": {
+                  "type": "boolean"
+                },
+                "evidence": {
+                  "$ref": "#/definitions/Evidence"
+                },
+                "withinTarget": {
+                  "type": "object",
+                  "properties": {
+                    "thresholdMs": {
+                      "$ref": "#/definitions/Quantity"
+                    },
+                    "fraction": {
+                      "$ref": "#/definitions/RateFact"
+                    }
+                  },
+                  "required": [
+                    "thresholdMs",
+                    "fraction"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "meaning",
+                "latencyMs",
+                "useful",
+                "evidence"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional independently available useful initial result. Acknowledgements do not qualify."
+        }
+      },
+      "required": [
+        "usefulOutput",
+        "latencyTargetMs",
+        "scope",
+        "targetPercentile",
+        "maxAgeMs",
+        "correctness",
+        "allowIndicative",
+        "allowDeferred",
+        "allowSlowMiss",
+        "finalDeadlineMs",
+        "hitsWithinTarget",
+        "hitsWithinTargetMs",
+        "initialOutput"
+      ],
+      "additionalProperties": false
+    },
+    "Infrastructure": {
+      "type": "object",
+      "properties": {
+        "cacheAllowed": {
+          "type": "boolean"
+        },
+        "schedulingAllowed": {
+          "type": "boolean"
+        },
+        "cacheCapacity": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "memoryBytes": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "refreshConcurrency": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "schedulingAllowanceMs": {
+          "$ref": "#/definitions/Fact"
+        },
+        "foregroundReserveCallsPerMinute": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "callBudgetPerMinute": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Quantity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "cacheAllowed",
+        "schedulingAllowed",
+        "cacheCapacity",
+        "memoryBytes",
+        "refreshConcurrency",
+        "schedulingAllowanceMs",
+        "foregroundReserveCallsPerMinute",
+        "callBudgetPerMinute"
+      ],
+      "additionalProperties": false
+    },
+    "RemainingPath": {
+      "type": "object",
+      "properties": {
+        "agentMs": {
+          "$ref": "#/definitions/Fact"
+        },
+        "networkMs": {
+          "$ref": "#/definitions/Fact"
+        },
+        "mappingMs": {
+          "$ref": "#/definitions/Fact"
+        },
+        "renderingMs": {
+          "$ref": "#/definitions/Fact"
+        },
+        "cacheLookupMs": {
+          "$ref": "#/definitions/Fact"
+        },
+        "deliveryAllowanceMs": {
+          "$ref": "#/definitions/Fact",
+          "description": "Bounded delivery allowance used in age eligibility, separate from point latency."
+        }
+      },
+      "required": [
+        "agentMs",
+        "networkMs",
+        "mappingMs",
+        "renderingMs",
+        "cacheLookupMs",
+        "deliveryAllowanceMs"
+      ],
+      "additionalProperties": false
+    },
+    "DesignInput": {
+      "type": "object",
+      "properties": {
+        "formatVersion": {
+          "$ref": "#/definitions/FormatVersion"
+        },
+        "systems": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SystemDescription"
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "Exactly two systems."
+        },
+        "connection": {
+          "type": "object",
+          "properties": {
+            "callerSystemId": {
+              "type": "string"
+            },
+            "callerOperationId": {
+              "type": "string"
+            },
+            "downstreamSystemId": {
+              "type": "string"
+            },
+            "downstreamOperationId": {
+              "type": "string"
+            },
+            "inputMapping": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "type": "string"
+                  },
+                  "to": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "from",
+                  "to"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "outputMapping": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "type": "string"
+                  },
+                  "to": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "from",
+                  "to"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "adapter": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "supplied": {
+                      "type": "boolean"
+                    },
+                    "overheadMs": {
+                      "$ref": "#/definitions/Fact"
+                    }
+                  },
+                  "required": [
+                    "supplied",
+                    "overheadMs"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "callerSystemId",
+            "callerOperationId",
+            "downstreamSystemId",
+            "downstreamOperationId",
+            "inputMapping",
+            "outputMapping",
+            "adapter"
+          ],
+          "additionalProperties": false
+        },
+        "profile": {
+          "$ref": "#/definitions/SystemProfile"
+        },
+        "workload": {
+          "$ref": "#/definitions/Workload"
+        },
+        "experience": {
+          "$ref": "#/definitions/Experience"
+        },
+        "infrastructure": {
+          "$ref": "#/definitions/Infrastructure"
+        },
+        "remainingPath": {
+          "$ref": "#/definitions/RemainingPath"
+        },
+        "preference": {
+          "type": "string",
+          "enum": [
+            "latency",
+            "cost",
+            "simplicity"
+          ]
+        }
+      },
+      "required": [
+        "formatVersion",
+        "systems",
+        "connection",
+        "profile",
+        "workload",
+        "experience",
+        "infrastructure",
+        "remainingPath",
+        "preference"
+      ],
+      "additionalProperties": false
+    },
+    "PatternId": {
+      "type": "string",
+      "enum": [
+        "direct",
+        "cache-aside",
+        "scheduled-cache",
+        "progressive",
+        "scheduled-cache-aside",
+        "cached-live"
+      ]
+    },
+    "CandidateStatus": {
+      "type": "string",
+      "enum": [
+        "feasible_under_declared_assumptions",
+        "conditional",
+        "infeasible",
+        "insufficient_information"
+      ]
+    },
+    "Criterion": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "verdict": {
+          "type": "string",
+          "enum": [
+            "pass_under_assumptions",
+            "fail",
+            "unknown"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "actual": {
+          "type": [
+            "number",
+            "string",
+            "null"
+          ]
+        },
+        "required": {
+          "type": [
+            "number",
+            "string",
+            "null"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "verdict",
+        "reason",
+        "actual",
+        "required",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "RunnerConfig": {
+      "type": "object",
+      "properties": {
+        "formatVersion": {
+          "$ref": "#/definitions/FormatVersion"
+        },
+        "pattern": {
+          "$ref": "#/definitions/PatternId"
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "public",
+            "user",
+            "tenant",
+            "unknown"
+          ]
+        },
+        "keyDimensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "maxAgeMs": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Quantity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "deliveryAllowanceMs": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Quantity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "capacity": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "maxBytes": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "refreshIntervalMs": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Quantity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "schedule": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "$ref": "#/definitions/ExactKey"
+              },
+              "offsetMs": {
+                "$ref": "#/definitions/Quantity"
+              }
+            },
+            "required": [
+              "key",
+              "offsetMs"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "prewarmKeys": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExactKey"
+          }
+        },
+        "concurrency": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "refreshConcurrency": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "callsPerMinute": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Quantity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "foregroundReserveCallsPerMinute": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "timeoutMs": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Quantity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sourceLagMs": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Quantity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sourceTimestamp": {
+          "type": "string",
+          "enum": [
+            "requestStart",
+            "responseSnapshot",
+            "observationOnly",
+            "unknown"
+          ]
+        },
+        "missPolicy": {
+          "type": "string",
+          "enum": [
+            "slow",
+            "target-unmet"
+          ]
+        },
+        "failurePolicy": {
+          "type": "string",
+          "const": "serve-only-within-age"
+        },
+        "latencyTargetMs": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "finalDeadlineMs": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Quantity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "formatVersion",
+        "pattern",
+        "scope",
+        "keyDimensions",
+        "maxAgeMs",
+        "deliveryAllowanceMs",
+        "capacity",
+        "maxBytes",
+        "refreshIntervalMs",
+        "schedule",
+        "prewarmKeys",
+        "concurrency",
+        "refreshConcurrency",
+        "callsPerMinute",
+        "foregroundReserveCallsPerMinute",
+        "timeoutMs",
+        "sourceLagMs",
+        "sourceTimestamp",
+        "missPolicy",
+        "failurePolicy",
+        "latencyTargetMs",
+        "finalDeadlineMs"
+      ],
+      "additionalProperties": false
+    },
+    "Candidate": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/PatternId"
+        },
+        "title": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/definitions/CandidateStatus"
+        },
+        "criteria": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Criterion"
+          }
+        },
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "diagram": {
+          "type": "string"
+        },
+        "config": {
+          "$ref": "#/definitions/RunnerConfig"
+        },
+        "policyHash": {
+          "type": "string"
+        },
+        "estimates": {
+          "type": "object",
+          "properties": {
+            "usefulLatencyMs": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Quantity"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "liveLatencyMs": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Quantity"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "ageEnvelopeMs": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Quantity"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "callsPerMinute": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Quantity"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "storageBytes": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Quantity"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "usableHitRate": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Fraction"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "trafficSuccessRate": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Fraction"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "coldStartMs": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Quantity"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "costPerMinute": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Quantity"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "usefulLatencyMs",
+            "liveLatencyMs",
+            "ageEnvelopeMs",
+            "callsPerMinute",
+            "storageBytes",
+            "usableHitRate",
+            "trafficSuccessRate",
+            "coldStartMs",
+            "costPerMinute"
+          ],
+          "additionalProperties": false
+        },
+        "metadataUnderstood": {
+          "type": "boolean"
+        },
+        "designEvaluated": {
+          "type": "boolean"
+        },
+        "executableHere": {
+          "type": "boolean"
+        },
+        "prerequisites": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "assumptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tradeoffs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tasks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "status",
+        "criteria",
+        "components",
+        "diagram",
+        "config",
+        "policyHash",
+        "estimates",
+        "metadataUnderstood",
+        "designEvaluated",
+        "executableHere",
+        "prerequisites",
+        "assumptions",
+        "tradeoffs",
+        "tasks"
+      ],
+      "additionalProperties": false
+    },
+    "DesignRecommendation": {
+      "type": "object",
+      "properties": {
+        "formatVersion": {
+          "$ref": "#/definitions/FormatVersion"
+        },
+        "catalogVersion": {
+          "type": "string"
+        },
+        "catalogHash": {
+          "type": "string"
+        },
+        "inputHash": {
+          "type": "string"
+        },
+        "designHash": {
+          "type": "string"
+        },
+        "selectedId": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PatternId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "candidates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Candidate"
+          }
+        },
+        "missingInformation": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "costRankingAvailable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "formatVersion",
+        "catalogVersion",
+        "catalogHash",
+        "inputHash",
+        "designHash",
+        "selectedId",
+        "candidates",
+        "missingInformation",
+        "costRankingAvailable"
+      ],
+      "additionalProperties": false
+    },
+    "DemoEvent": {
+      "type": "object",
+      "properties": {
+        "formatVersion": {
+          "$ref": "#/definitions/FormatVersion"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "session",
+            "warmup",
+            "request-start",
+            "cache-hit",
+            "cache-miss",
+            "cache-expiry",
+            "refresh-start",
+            "refresh-success",
+            "refresh-failure",
+            "source-start",
+            "fault-armed",
+            "source-completion",
+            "result-delivery",
+            "target-miss",
+            "sandbox-termination",
+            "data-change"
+          ]
+        },
+        "atMs": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "actionId": {
+          "type": "string"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "actionToken": {
+          "type": "string"
+        },
+        "key": {
+          "$ref": "#/definitions/ExactKey"
+        },
+        "durationMs": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "dataAgeMs": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "observedAt": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "sourceSnapshotAt": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "cost": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Quantity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "data": {
+          "$ref": "#/definitions/JsonObject"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "formatVersion",
+        "type",
+        "atMs",
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "SourceResponse": {
+      "type": "object",
+      "properties": {
+        "snapshotAt": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "version": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "data": {
+          "$ref": "#/definitions/JsonObject"
+        }
+      },
+      "required": [
+        "snapshotAt",
+        "version",
+        "data"
+      ],
+      "additionalProperties": false,
+      "description": "Fixed trusted-local HTTP response envelope; data is checked against the selected output contract."
+    }
+  }
+}

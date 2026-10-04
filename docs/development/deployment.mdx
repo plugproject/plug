@@ -1,0 +1,31 @@
+---
+title: Deployment
+---
+
+The default host configuration is `render.yaml`: one Node 24 process and origin,
+`npm ci && npm run build`, then `npm start`. Bind 0.0.0.0 and platform PORT.
+No host credentials or public deployment were available during bootstrap.
+
+Connect this repository in Render, create the Blueprint service, and use the
+host-provided domain. Free service is explicitly configured; no paid tier is
+required by this configuration. Owner budget authorization is needed for an
+always-on paid tier. Set APP_ORIGIN to the exact public HTTPS origin. Leave
+TRUST_PROXY_HOPS=0 until the platform's actual forwarding chain has been verified;
+configure the exact numeric hop count, never blanket trust. With zero hops, a
+shared proxy may cause conservative aggregate throttling.
+
+Verify /healthz and its release commit, first NDJSON delivery, 15-second source
+warmup, valid fast hit, later scheduled refresh, changed version, failed refresh,
+expiry, cancellation, per-IP caps and global four-session limit through the host.
+No payload/token logs. Logs contain aggregate counts and terminal outcomes only.
+SIGTERM aborts calls and clears timers/cache. Redeploy/restart begins cold. Keep one
+instance: this alpha has no shared state, durability or HA. Roll back to the prior
+verified commit using the host's deployment controls and repeat the smoke checks.
+
+Render free instances sleep after idle periods and can take about a minute to wake;
+this affects first load, not a claim that the source has become faster. Record the
+verified commit, URL and limitations in RELEASE_NOTES.md after actual deployment.
+
+[Render Node deployment](https://render.com/docs/deploy-node-express-app),
+[Node version configuration](https://render.com/docs/node-version), and
+[free-instance limits](https://render.com/docs/free).

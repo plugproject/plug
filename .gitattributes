@@ -1,0 +1,5 @@
+* text=auto eol=lf
+schema/draft/schema.json linguist-generated=true
+docs/specification/draft/schema.mdx linguist-generated=true
+docs/seps/*.mdx linguist-generated=true
+schema/draft/validators.* linguist-generated=true

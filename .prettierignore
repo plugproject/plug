@@ -1,0 +1,9 @@
+node_modules
+dist
+package-lock.json
+IMPLEMENTATION-v2.md
+schema/draft/schema.json
+docs/specification/draft/schema.mdx
+docs/seps
+schema/draft/validators.js
+schema/draft/validators.d.ts

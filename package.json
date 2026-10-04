@@ -1,0 +1,59 @@
+{
+  "name": "plug-workspace",
+  "private": true,
+  "version": "0.1.0-alpha.2",
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "tsx watch apps/playground/server.ts",
+    "generate:schema": "tsx scripts/generate-schemas.ts && tsx scripts/render-schema-docs.ts",
+    "generate:seps": "tsx scripts/render-seps.ts",
+    "generate": "npm run generate:schema && npm run generate:seps",
+    "check:generated": "tsx scripts/check-generated.ts",
+    "check:docs": "tsx scripts/check-seps.ts && tsx scripts/check-docs.ts",
+    "check": "tsc --noEmit && eslint . && npm run check:format && npm run check:generated && tsx scripts/validate-examples.ts && npm run check:docs && vitest run",
+    "test": "vitest run",
+    "test:browser": "playwright test",
+    "build": "npm run generate && tsx scripts/build.ts && vite build --config apps/playground/vite.config.ts",
+    "start": "NODE_ENV=production node dist/server.js",
+    "example:flight": "tsx examples/flight-search/run.ts",
+    "example:http": "tsx examples/your-http-api/run.ts",
+    "serve:docs": "tsx scripts/serve-docs.ts",
+    "format": "prettier --write .",
+    "check:format": "prettier --check .",
+    "test:package": "tsx scripts/test-package.ts"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "express": "5.2.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "yaml": "2.9.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.63.0",
+    "@types/express": "5.0.6",
+    "@types/node": "24.3.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "esbuild": "0.28.2",
+    "eslint": "10.12.0",
+    "marked": "18.0.14",
+    "prettier": "3.9.9",
+    "ts-json-schema-generator": "2.9.0",
+    "tsx": "4.23.15",
+    "typescript": "5.9.2",
+    "typescript-eslint": "8.71.0",
+    "vite": "8.3.2",
+    "vitest": "4.1.11"
+  }
+}

@@ -1,0 +1,23 @@
+---
+title: Architecture
+---
+
+Exactly two systems and selected operations are required. Public contracts belong
+in `schema/draft/schema.ts`. JSON Schema and reference documentation are generated.
+AJV validates the public schema; semantic checks enforce cross-field constraints.
+All units are milliseconds and numeric facts are finite and bounded.
+
+Protocol direction is explicit. An A2A exposure does not imply an MCP client. Missing
+conversion creates ADAPTER_REQUIRED with unknown overhead until supplied. Alpha
+mapping validation supports explicit top-level fields; nested transforms require
+an adapter and remain prerequisites. Analysis has no network calls, LLM or ambient
+telemetry. Hosted submitted descriptions never become executable bindings.
+
+Manual descriptions, MCP 2025-11-25 tools/list and A2A 1.0 Agent Cards are supported.
+MCP wrappers provide server identity and negotiated version. Remaining nextCursor
+means incomplete discovery. Missing MCP inputSchema is an error. A2A skills do not
+create structured schemas. Preserve metadata and schema dialects. No remote schema
+fetching, YAML aliases/tags, executable expressions or credential collection.
+
+Sources: [MCP tools](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)
+and [A2A 1.0](https://a2a-protocol.org/v1.0.0/specification/).

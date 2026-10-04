@@ -1,0 +1,84 @@
+{
+  "systemId": "aggregator",
+  "operationId": "search",
+  "latencyMs": {
+    "value": 15000,
+    "evidence": {
+      "kind": "synthetic",
+      "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+      "sampleSize": 500,
+      "windowMs": 600000,
+      "measuredAt": "2026-10-04"
+    }
+  },
+  "latencyPercentile": null,
+  "timeoutMs": {
+    "value": 20000,
+    "evidence": {
+      "kind": "synthetic",
+      "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+      "sampleSize": 500,
+      "windowMs": 600000,
+      "measuredAt": "2026-10-04"
+    }
+  },
+  "callsPerMinute": {
+    "value": 6,
+    "evidence": {
+      "kind": "synthetic",
+      "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+      "sampleSize": 500,
+      "windowMs": 600000,
+      "measuredAt": "2026-10-04"
+    }
+  },
+  "concurrency": {
+    "value": 2,
+    "evidence": {
+      "kind": "synthetic",
+      "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+      "sampleSize": 500,
+      "windowMs": 600000,
+      "measuredAt": "2026-10-04"
+    }
+  },
+  "responseBytes": {
+    "value": 4096,
+    "evidence": {
+      "kind": "synthetic",
+      "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+      "sampleSize": 500,
+      "windowMs": 600000,
+      "measuredAt": "2026-10-04"
+    }
+  },
+  "callCost": {
+    "value": null,
+    "evidence": {
+      "kind": "unknown",
+      "note": "Not supplied"
+    }
+  },
+  "changeIntervalMs": {
+    "value": 300000,
+    "evidence": {
+      "kind": "synthetic",
+      "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+      "sampleSize": 500,
+      "windowMs": 600000,
+      "measuredAt": "2026-10-04"
+    }
+  },
+  "sourceTimestamp": "requestStart",
+  "sourceLagMs": {
+    "value": 0,
+    "evidence": {
+      "kind": "synthetic",
+      "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+      "sampleSize": 500,
+      "windowMs": 600000,
+      "measuredAt": "2026-10-04"
+    }
+  },
+  "invalidation": "none"
+}

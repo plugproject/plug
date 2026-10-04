@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: plug-playground
+    runtime: node
+    plan: free
+    numInstances: 1
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: 24
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY_HOPS
+        value: 0
+      - key: APP_ORIGIN
+        sync: false

@@ -1,0 +1,19 @@
+---
+title: Development setup
+---
+
+Use `.nvmrc` (Node 24) and `npm ci`. `npm run generate:schema` produces JSON Schema
+and field-level reference docs, plus standalone AJV validators that require no
+runtime script evaluation in the browser. `npm run generate:seps` renders root proposals.
+`npm run generate` runs both; `npm run check:generated` rejects drift.
+
+`npm run check` includes TypeScript, ESLint, generated artifact comparison, examples,
+documentation/SEP formatting and link checks, and Vitest. `npm run test:browser` runs Playwright against
+a local development service. After building, set `PLUG_TEST_PRODUCTION=1` to exercise
+the production service and its content security policy (CI uses this mode). Install Chromium once using `npx playwright install chromium`.
+A dedicated real HTTP integration test takes at least 15 seconds. Other lifecycle
+checks use injected/fake clocks and controlled sources.
+
+`npm run build` bundles the reference package, declarations/schema, service and UI.
+`npm run serve:docs` keeps a local documentation preview running on port 3333. The MDX tree
+and docs.json also work with Mintlify; paid documentation hosting is not required.

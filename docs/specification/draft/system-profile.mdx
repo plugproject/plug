@@ -1,0 +1,14 @@
+---
+title: System profiles
+---
+
+Each profile is bound to the selected downstream operation. Facts include latency,
+percentile if known, hard timeout, quota, concurrency, response bytes, optional call
+cost, change interval, source timestamp meaning and maximum source lag. Each fact
+carries provenance and optional measurement date, window and sample size.
+
+Read/write effects, idempotency, output meaning, cache permission, sharing scope and
+all output-changing dimensions are explicit. User/tenant scope requires userId or
+tenantId in the exact key. MCP annotations are hints; tool-list changes do not invalidate
+business data. A2A push/streaming flags are not freshness or latency guarantees.
+Observation-only sources require bounded lag; fetch time alone does not prove source age.
