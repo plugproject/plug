@@ -57,7 +57,9 @@ it('health is cheap and hosted analysis never invokes descriptor endpoints', asy
   const response = await post('/api/analyze', input);
   expect(response.status).toBe(200);
   expect(service.sessions.size).toBe(0);
-  expect((await response.json()).report.selectedId).toBe('scheduled-cache');
+  expect((await response.json()).report.connections[0].selectedId).toBe(
+    'scheduled-cache',
+  );
 });
 it('rejects stale/tampered execution and non-allowlisted request fields', async () => {
   expect(
@@ -145,4 +147,10 @@ it('rejects oversized, deep and remote-reference inputs', async () => {
     $ref: 'http://evil.test/schema',
   };
   expect((await post('/api/analyze', input)).status).toBe(400);
+});
+it('never exposes workspace, index or spec endpoints on the hosted service', async () => {
+  for (const path of ['/api/workspace', '/api/workspace/spec'])
+    expect((await fetch(base + path)).status).toBe(404);
+  for (const path of ['/api/workspace/index', '/api/workspace/spec'])
+    expect((await post(path, { input: flightInput() })).status).toBe(404);
 });

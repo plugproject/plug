@@ -27,6 +27,7 @@
           "specification/draft/experience",
           "specification/draft/patterns",
           "specification/draft/recommendations",
+          "specification/draft/interchange",
           "specification/draft/changelog",
           "specification/draft/schema"
         ]
@@ -40,7 +41,10 @@
         "pages": [
           "community/design-principles",
           "community/sep-guidelines",
-          "seps/0000-public-alpha-design"
+          "seps/0000-public-alpha-design",
+          "seps/0000-local-workbench-and-multi-system",
+          "seps/0000-workflow-graph-and-openspec",
+          "seps/0000-local-mcp-a2a-discovery"
         ]
       }
     ]

@@ -32,6 +32,10 @@ const roots = [
   'SystemDescription',
   'RunnerConfig',
   'SourceResponse',
+  'WorkspaceIndex',
+  'PatternDefinition',
+  'WorkflowSpecMetadata',
+  'WorkflowTaskMetadata',
 ];
 const validators = standaloneCode(
   ajv,

@@ -1,0 +1,37 @@
+{
+  "scope": "pairwise",
+  "template": null,
+  "preconditions": [
+    {
+      "fact": "deferredAllowed",
+      "is": true
+    }
+  ],
+  "contraindications": [],
+  "requiresOneOf": [
+    {
+      "fact": "laterResultPath",
+      "is": true
+    }
+  ],
+  "solves": ["first_response_gap"],
+  "introduces": ["correlation", "bounded_attempt"],
+  "conflicts": [],
+  "composesWith": ["correlation-identifier", "timeout"],
+  "components": ["Asynchronous request-reply"],
+  "evidenceNeeds": [],
+  "tasks": [
+    "Acknowledge immediately, then deliver the result through the declared callback, polling resource or stream. An acknowledgement is not useful output.",
+    "Expire unclaimed results and propagate cancellation."
+  ],
+  "executableHere": false,
+  "id": "async-request-reply",
+  "title": "Asynchronous request-reply",
+  "family": "interaction",
+  "tradeoffs": {
+    "consistencyWeakening": 1,
+    "runtimeCoupling": 1,
+    "operationalComplexity": 2,
+    "statefulness": 1
+  }
+}

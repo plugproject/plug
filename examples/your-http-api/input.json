@@ -1,10 +1,11 @@
 {
-  "formatVersion": "0.1-alpha.2",
+  "formatVersion": "0.2-alpha.1",
   "systems": [
     {
       "id": "agent",
       "name": "Inventory assistant",
       "role": "caller",
+      "trustDomain": "plug-fixture",
       "interfaces": [
         {
           "id": "http-client",
@@ -69,6 +70,13 @@
       "id": "aggregator",
       "name": "Warehouse inventory API",
       "role": "downstream",
+      "trustDomain": "plug-fixture",
+      "messaging": {
+        "delivery": "none",
+        "ordering": "none",
+        "durable": null,
+        "dlq": null
+      },
       "interfaces": [
         {
           "id": "http-server",
@@ -125,894 +133,982 @@
               "windowMs": 600000,
               "measuredAt": "2026-10-04"
             }
+          },
+          "interaction": {
+            "callback": false,
+            "polling": false,
+            "streaming": "none",
+            "cancellation": true
           }
         }
       ]
     }
   ],
-  "connection": {
-    "callerSystemId": "agent",
-    "callerOperationId": "find-options",
-    "downstreamSystemId": "aggregator",
-    "downstreamOperationId": "search",
-    "inputMapping": [
-      {
-        "from": "sku",
-        "to": "sku"
+  "connections": [
+    {
+      "id": "primary",
+      "callerSystemId": "agent",
+      "callerOperationId": "find-options",
+      "downstreamSystemId": "aggregator",
+      "downstreamOperationId": "search",
+      "inputMapping": [
+        {
+          "from": "sku",
+          "to": "sku"
+        },
+        {
+          "from": "warehouse",
+          "to": "warehouse"
+        }
+      ],
+      "outputMapping": [
+        {
+          "from": "stock",
+          "to": "stock"
+        },
+        {
+          "from": "warehouse",
+          "to": "warehouse"
+        }
+      ],
+      "adapter": null,
+      "profile": {
+        "systemId": "aggregator",
+        "operationId": "search",
+        "latencyMs": {
+          "value": 250,
+          "evidence": {
+            "kind": "synthetic",
+            "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+            "sampleSize": 500,
+            "windowMs": 600000,
+            "measuredAt": "2026-10-04"
+          }
+        },
+        "latencyPercentile": null,
+        "timeoutMs": {
+          "value": 1000,
+          "evidence": {
+            "kind": "synthetic",
+            "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+            "sampleSize": 500,
+            "windowMs": 600000,
+            "measuredAt": "2026-10-04"
+          }
+        },
+        "callsPerMinute": {
+          "value": 120,
+          "evidence": {
+            "kind": "synthetic",
+            "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+            "sampleSize": 500,
+            "windowMs": 600000,
+            "measuredAt": "2026-10-04"
+          }
+        },
+        "concurrency": {
+          "value": 2,
+          "evidence": {
+            "kind": "synthetic",
+            "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+            "sampleSize": 500,
+            "windowMs": 600000,
+            "measuredAt": "2026-10-04"
+          }
+        },
+        "responseBytes": {
+          "value": 1024,
+          "evidence": {
+            "kind": "synthetic",
+            "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+            "sampleSize": 500,
+            "windowMs": 600000,
+            "measuredAt": "2026-10-04"
+          }
+        },
+        "callCost": {
+          "value": null,
+          "evidence": {
+            "kind": "unknown",
+            "note": "Not supplied"
+          }
+        },
+        "changeIntervalMs": {
+          "value": 60000,
+          "evidence": {
+            "kind": "synthetic",
+            "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+            "sampleSize": 500,
+            "windowMs": 600000,
+            "measuredAt": "2026-10-04"
+          }
+        },
+        "sourceTimestamp": "requestStart",
+        "sourceLagMs": {
+          "value": 0,
+          "evidence": {
+            "kind": "synthetic",
+            "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+            "sampleSize": 500,
+            "windowMs": 600000,
+            "measuredAt": "2026-10-04"
+          }
+        },
+        "invalidation": "none"
       },
-      {
-        "from": "warehouse",
-        "to": "warehouse"
+      "workload": {
+        "requestsPerMinute": {
+          "value": 30,
+          "evidence": {
+            "kind": "synthetic",
+            "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+            "sampleSize": 500,
+            "windowMs": 600000,
+            "measuredAt": "2026-10-04"
+          }
+        },
+        "burstPerMinute": {
+          "value": 60,
+          "evidence": {
+            "kind": "synthetic",
+            "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+            "sampleSize": 500,
+            "windowMs": 600000,
+            "measuredAt": "2026-10-04"
+          }
+        },
+        "hotKeyShare": {
+          "value": 1,
+          "evidence": {
+            "kind": "synthetic",
+            "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+            "sampleSize": 500,
+            "windowMs": 600000,
+            "measuredAt": "2026-10-04"
+          }
+        },
+        "prewarmKeys": [
+          {
+            "sku": "PLUG-1",
+            "warehouse": "south"
+          }
+        ],
+        "keyCount": {
+          "value": 1,
+          "evidence": {
+            "kind": "synthetic",
+            "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+            "sampleSize": 500,
+            "windowMs": 600000,
+            "measuredAt": "2026-10-04"
+          }
+        },
+        "trace": [
+          {
+            "atMs": 2000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 4000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 6000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 8000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 10000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 12000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 14000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 16000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 18000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 20000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 22000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 24000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 26000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 28000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 30000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 32000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 34000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 36000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 38000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 40000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 42000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 44000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 46000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 48000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 50000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 52000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 54000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 56000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 58000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 60000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 62000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 64000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 66000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 68000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 70000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 72000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 74000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 76000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 78000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 80000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 82000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 84000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 86000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 88000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 90000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 92000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 94000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 96000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 98000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 100000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 102000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 104000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 106000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 108000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 110000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 112000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 114000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 116000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 118000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 120000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 122000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 124000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 126000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 128000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 130000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 132000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 134000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 136000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 138000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 140000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 142000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 144000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 146000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 148000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 150000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 152000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 154000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 156000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 158000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 160000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 162000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 164000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 166000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 168000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 170000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 172000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 174000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 176000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 178000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 180000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 182000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 184000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 186000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 188000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 190000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 192000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 194000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 196000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 198000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          },
+          {
+            "atMs": 200000,
+            "key": {
+              "sku": "PLUG-1",
+              "warehouse": "south"
+            }
+          }
+        ],
+        "traceEvidence": {
+          "kind": "synthetic",
+          "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+          "sampleSize": 500,
+          "windowMs": 600000,
+          "measuredAt": "2026-10-04"
+        },
+        "measurementStartMs": 2000
+      },
+      "experience": {
+        "usefulOutput": "indicative stock count",
+        "latencyTargetMs": 100,
+        "scope": "trafficPercentile",
+        "targetPercentile": 0.95,
+        "maxAgeMs": 15000,
+        "correctness": "indicative",
+        "allowIndicative": true,
+        "allowDeferred": false,
+        "allowSlowMiss": true,
+        "finalDeadlineMs": 25000,
+        "hitsWithinTarget": {
+          "value": 0.99,
+          "evidence": {
+            "kind": "synthetic",
+            "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+            "sampleSize": 500,
+            "windowMs": 600000,
+            "measuredAt": "2026-10-04"
+          }
+        },
+        "hitsWithinTargetMs": 100,
+        "initialOutput": null,
+        "priorities": [
+          "correctness",
+          "cost",
+          "latency",
+          "availability",
+          "simplicity"
+        ]
+      },
+      "remainingPath": {
+        "agentMs": {
+          "value": 5,
+          "evidence": {
+            "kind": "synthetic",
+            "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+            "sampleSize": 500,
+            "windowMs": 600000,
+            "measuredAt": "2026-10-04"
+          }
+        },
+        "networkMs": {
+          "value": 5,
+          "evidence": {
+            "kind": "synthetic",
+            "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+            "sampleSize": 500,
+            "windowMs": 600000,
+            "measuredAt": "2026-10-04"
+          }
+        },
+        "mappingMs": {
+          "value": 5,
+          "evidence": {
+            "kind": "synthetic",
+            "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+            "sampleSize": 500,
+            "windowMs": 600000,
+            "measuredAt": "2026-10-04"
+          }
+        },
+        "renderingMs": {
+          "value": 5,
+          "evidence": {
+            "kind": "synthetic",
+            "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+            "sampleSize": 500,
+            "windowMs": 600000,
+            "measuredAt": "2026-10-04"
+          }
+        },
+        "cacheLookupMs": {
+          "value": 5,
+          "evidence": {
+            "kind": "synthetic",
+            "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+            "sampleSize": 500,
+            "windowMs": 600000,
+            "measuredAt": "2026-10-04"
+          }
+        },
+        "deliveryAllowanceMs": {
+          "value": 50,
+          "evidence": {
+            "kind": "synthetic",
+            "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
+            "sampleSize": 500,
+            "windowMs": 600000,
+            "measuredAt": "2026-10-04"
+          }
+        }
       }
-    ],
-    "outputMapping": [
-      {
-        "from": "stock",
-        "to": "stock"
-      },
-      {
-        "from": "warehouse",
-        "to": "warehouse"
-      }
-    ],
-    "adapter": null
-  },
-  "profile": {
-    "systemId": "aggregator",
-    "operationId": "search",
-    "latencyMs": {
-      "value": 250,
-      "evidence": {
-        "kind": "synthetic",
-        "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
-        "sampleSize": 500,
-        "windowMs": 600000,
-        "measuredAt": "2026-10-04"
-      }
-    },
-    "latencyPercentile": null,
-    "timeoutMs": {
-      "value": 1000,
-      "evidence": {
-        "kind": "synthetic",
-        "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
-        "sampleSize": 500,
-        "windowMs": 600000,
-        "measuredAt": "2026-10-04"
-      }
-    },
-    "callsPerMinute": {
-      "value": 120,
-      "evidence": {
-        "kind": "synthetic",
-        "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
-        "sampleSize": 500,
-        "windowMs": 600000,
-        "measuredAt": "2026-10-04"
-      }
-    },
-    "concurrency": {
-      "value": 2,
-      "evidence": {
-        "kind": "synthetic",
-        "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
-        "sampleSize": 500,
-        "windowMs": 600000,
-        "measuredAt": "2026-10-04"
-      }
-    },
-    "responseBytes": {
-      "value": 1024,
-      "evidence": {
-        "kind": "synthetic",
-        "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
-        "sampleSize": 500,
-        "windowMs": 600000,
-        "measuredAt": "2026-10-04"
-      }
-    },
-    "callCost": {
-      "value": null,
-      "evidence": {
-        "kind": "unknown",
-        "note": "Not supplied"
-      }
-    },
-    "changeIntervalMs": {
-      "value": 60000,
-      "evidence": {
-        "kind": "synthetic",
-        "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
-        "sampleSize": 500,
-        "windowMs": 600000,
-        "measuredAt": "2026-10-04"
-      }
-    },
-    "sourceTimestamp": "requestStart",
-    "sourceLagMs": {
-      "value": 0,
-      "evidence": {
-        "kind": "synthetic",
-        "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
-        "sampleSize": 500,
-        "windowMs": 600000,
-        "measuredAt": "2026-10-04"
-      }
-    },
-    "invalidation": "none"
-  },
-  "workload": {
-    "requestsPerMinute": {
-      "value": 30,
-      "evidence": {
-        "kind": "synthetic",
-        "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
-        "sampleSize": 500,
-        "windowMs": 600000,
-        "measuredAt": "2026-10-04"
-      }
-    },
-    "hotKeyShare": {
-      "value": 1,
-      "evidence": {
-        "kind": "synthetic",
-        "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
-        "sampleSize": 500,
-        "windowMs": 600000,
-        "measuredAt": "2026-10-04"
-      }
-    },
-    "prewarmKeys": [
-      {
-        "sku": "PLUG-1",
-        "warehouse": "south"
-      }
-    ],
-    "keyCount": {
-      "value": 1,
-      "evidence": {
-        "kind": "synthetic",
-        "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
-        "sampleSize": 500,
-        "windowMs": 600000,
-        "measuredAt": "2026-10-04"
-      }
-    },
-    "trace": [
-      {
-        "atMs": 2000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 4000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 6000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 8000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 10000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 12000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 14000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 16000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 18000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 20000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 22000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 24000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 26000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 28000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 30000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 32000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 34000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 36000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 38000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 40000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 42000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 44000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 46000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 48000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 50000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 52000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 54000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 56000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 58000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 60000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 62000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 64000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 66000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 68000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 70000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 72000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 74000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 76000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 78000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 80000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 82000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 84000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 86000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 88000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 90000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 92000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 94000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 96000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 98000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 100000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 102000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 104000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 106000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 108000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 110000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 112000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 114000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 116000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 118000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 120000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 122000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 124000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 126000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 128000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 130000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 132000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 134000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 136000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 138000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 140000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 142000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 144000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 146000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 148000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 150000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 152000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 154000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 156000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 158000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 160000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 162000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 164000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 166000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 168000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 170000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 172000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 174000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 176000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 178000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 180000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 182000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 184000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 186000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 188000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 190000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 192000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 194000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 196000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 198000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      },
-      {
-        "atMs": 200000,
-        "key": {
-          "sku": "PLUG-1",
-          "warehouse": "south"
-        }
-      }
-    ],
-    "traceEvidence": {
-      "kind": "synthetic",
-      "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
-      "sampleSize": 500,
-      "windowMs": 600000,
-      "measuredAt": "2026-10-04"
-    },
-    "measurementStartMs": 2000
-  },
-  "experience": {
-    "usefulOutput": "indicative stock count",
-    "latencyTargetMs": 100,
-    "scope": "trafficPercentile",
-    "targetPercentile": 0.95,
-    "maxAgeMs": 15000,
-    "correctness": "indicative",
-    "allowIndicative": true,
-    "allowDeferred": false,
-    "allowSlowMiss": true,
-    "finalDeadlineMs": 25000,
-    "hitsWithinTarget": {
-      "value": 0.99,
-      "evidence": {
-        "kind": "synthetic",
-        "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
-        "sampleSize": 500,
-        "windowMs": 600000,
-        "measuredAt": "2026-10-04"
-      }
-    },
-    "hitsWithinTargetMs": 100,
-    "initialOutput": null
-  },
+    }
+  ],
   "infrastructure": {
     "cacheAllowed": true,
     "schedulingAllowed": true,
@@ -1031,68 +1127,5 @@
     },
     "foregroundReserveCallsPerMinute": 2,
     "callBudgetPerMinute": null
-  },
-  "remainingPath": {
-    "agentMs": {
-      "value": 5,
-      "evidence": {
-        "kind": "synthetic",
-        "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
-        "sampleSize": 500,
-        "windowMs": 600000,
-        "measuredAt": "2026-10-04"
-      }
-    },
-    "networkMs": {
-      "value": 5,
-      "evidence": {
-        "kind": "synthetic",
-        "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
-        "sampleSize": 500,
-        "windowMs": 600000,
-        "measuredAt": "2026-10-04"
-      }
-    },
-    "mappingMs": {
-      "value": 5,
-      "evidence": {
-        "kind": "synthetic",
-        "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
-        "sampleSize": 500,
-        "windowMs": 600000,
-        "measuredAt": "2026-10-04"
-      }
-    },
-    "renderingMs": {
-      "value": 5,
-      "evidence": {
-        "kind": "synthetic",
-        "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
-        "sampleSize": 500,
-        "windowMs": 600000,
-        "measuredAt": "2026-10-04"
-      }
-    },
-    "cacheLookupMs": {
-      "value": 5,
-      "evidence": {
-        "kind": "synthetic",
-        "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
-        "sampleSize": 500,
-        "windowMs": 600000,
-        "measuredAt": "2026-10-04"
-      }
-    },
-    "deliveryAllowanceMs": {
-      "value": 50,
-      "evidence": {
-        "kind": "synthetic",
-        "note": "Bundled synthetic fixture assumption; validate with representative production traffic.",
-        "sampleSize": 500,
-        "windowMs": 600000,
-        "measuredAt": "2026-10-04"
-      }
-    }
-  },
-  "preference": "cost"
+  }
 }

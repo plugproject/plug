@@ -9,9 +9,11 @@ import type {
 } from '../packages/plug/src/contracts/index';
 function design(pattern: Candidate['id'] = 'cache-aside') {
   const input = flightInput();
-  input.experience.allowDeferred = true;
+  input.connections[0].experience.allowDeferred = true;
   const c = structuredClone(
-    suggestDesign(input).candidates.find((c) => c.id === pattern)!,
+    suggestDesign(input).connections[0].candidates.find(
+      (c) => c.id === pattern,
+    )!,
   );
   Object.assign(c.config, {
     maxAgeMs: 1000,

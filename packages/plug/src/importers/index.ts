@@ -122,18 +122,45 @@ export function importMcp(raw: unknown): ImportReview {
     executableHere: false,
   };
 }
+/** Pre-1.0 cards name their transports in url, preferredTransport and additionalInterfaces. */
+function legacyInterfaces(card: Record<string, any>): unknown[] | null {
+  if (typeof card.url !== 'string') return null;
+  const version =
+    typeof card.protocolVersion === 'string' ? card.protocolVersion : 'unknown';
+  const listed = [
+    { url: card.url, transport: card.preferredTransport ?? 'JSONRPC' },
+    ...(Array.isArray(card.additionalInterfaces)
+      ? card.additionalInterfaces
+      : []),
+  ];
+  const seen = new Set<string>();
+  return listed.flatMap((v: unknown) => {
+    const f = object(v, 'AgentInterface');
+    if (typeof f.url !== 'string' || typeof f.transport !== 'string')
+      throw new Error('AgentInterface requires url and transport');
+    const key = `${f.transport} ${f.url}`;
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return [
+      { url: f.url, protocolVersion: version, protocolBinding: f.transport },
+    ];
+  });
+}
 export function importA2a(raw: unknown, id = 'imported-agent'): ImportReview {
   guardDocument(raw);
   const card = object(raw, 'Agent Card');
+  const declared =
+    Array.isArray(card.supportedInterfaces) && card.supportedInterfaces.length
+      ? card.supportedInterfaces
+      : legacyInterfaces(card);
   if (
     typeof card.name !== 'string' ||
-    !Array.isArray(card.supportedInterfaces) ||
-    !card.supportedInterfaces.length ||
+    !declared?.length ||
     !Array.isArray(card.skills) ||
     !card.skills.length
   )
     throw new Error('A2A 1.0 requires name, supportedInterfaces and skills');
-  const interfaces = card.supportedInterfaces.map((v: unknown, i: number) => {
+  const interfaces = declared.map((v: unknown, i: number) => {
     const f = object(v, 'AgentInterface');
     if (
       typeof f.url !== 'string' ||
@@ -160,6 +187,10 @@ export function importA2a(raw: unknown, id = 'imported-agent'): ImportReview {
   const understood = interfaces.every((i) => i.version === '1.0');
   if (!understood)
     gaps.push('Unsupported A2A interface version preserved for review.');
+  if (declared !== card.supportedInterfaces)
+    gaps.push(
+      'Pre-1.0 Agent Card: transports were read from url, preferredTransport and additionalInterfaces.',
+    );
   if (card.skills.length > 4)
     throw new Error('Select up to four skills before import');
   const operations: Operation[] = card.skills.map((s: unknown) => {

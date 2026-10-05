@@ -2,9 +2,27 @@
 title: Pattern catalog
 ---
 
-The catalog contains direct request, cache-aside, scheduled refresh/prefetch + cache,
-progressive useful output + live completion, scheduled cache with miss filling, and
-cached initial output followed by live refresh. General composition is deferred.
+Six seed designs remain: direct request, cache-aside, scheduled refresh/prefetch +
+cache, progressive useful output + live completion, scheduled cache with miss
+filling, and cached initial output followed by live refresh. Their evaluation is
+unchanged and every architecture starts from one of them.
+
+Patterns are versioned data (`PatternDefinition`): preconditions,
+contraindications, required alternatives, problems solved, obligations introduced,
+conflicts and a trade-off profile. The pairwise tranche adds adapter, message
+translator, anti-corruption layer, asynchronous request-reply, correlation
+identifier, timeout, queue-based load leveling, competing consumers, rate limiting,
+retry with backoff, circuit breaker, idempotent consumer, dead-letter channel,
+transactional outbox, outbox relay, sequential convoy and boundary authentication.
+Backend for frontend, canonical data model, message bus, deployment stamps and
+service decomposition report `needs_global_context` and are never selected.
+
+Each pattern evaluates to required, supported, optional, contraindicated,
+not_applicable, unknown or needs_global_context from three-valued relation facts.
+An unknown fact never satisfies or rejects a precondition. Retry is contraindicated
+for writes that are neither idempotent nor keyed; asynchronous request-reply needs
+a callback, polling resource or result stream; competing consumers and sequential
+convoy are contraindicated by global ordering.
 
 Cache requires an eligible read, explicit permission, complete scoped keys and
 accepted indicative age. Only enumerated keys are retained; other keys do not evict

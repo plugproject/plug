@@ -2,10 +2,20 @@
 title: Architecture
 ---
 
-Exactly two systems and selected operations are required. Public contracts belong
-in `schema/draft/schema.ts`. JSON Schema and reference documentation are generated.
-AJV validates the public schema; semantic checks enforce cross-field constraints.
-All units are milliseconds and numeric facts are finite and bounded.
+A design input holds two to eight systems and one to twelve connections. Each
+connection selects a caller operation and a downstream operation on distinct
+systems, with its own mappings, profile, workload, experience and remaining path;
+infrastructure is shared. Each connection selects a distinct operation pair, and
+one operation may take part in several connections, so callers and downstreams
+map n:n.
+Public contracts belong in `schema/draft/schema.ts`. JSON Schema and reference
+documentation are generated. AJV validates the public schema; semantic checks
+enforce cross-field constraints. All units are milliseconds and numeric facts are
+finite and bounded.
+
+A `0.1-alpha.2` document migrates mechanically: its single connection becomes
+connection `primary`, and its preference becomes priorities `correctness`, the
+preference, then the remaining defaults. Unknown legacy fields are rejected.
 
 Protocol direction is explicit. An A2A exposure does not imply an MCP client. Missing
 conversion creates ADAPTER_REQUIRED with unknown overhead until supplied. Alpha
@@ -16,8 +26,32 @@ telemetry. Hosted submitted descriptions never become executable bindings.
 Manual descriptions, MCP 2025-11-25 tools/list and A2A 1.0 Agent Cards are supported.
 MCP wrappers provide server identity and negotiated version. Remaining nextCursor
 means incomplete discovery. Missing MCP inputSchema is an error. A2A skills do not
-create structured schemas. Preserve metadata and schema dialects. No remote schema
-fetching, YAML aliases/tags, executable expressions or credential collection.
+create structured schemas. Preserve metadata and schema dialects. Analysis and
+imports never fetch remote schemas, accept YAML aliases/tags or executable
+expressions, or collect credentials; only local discovery, below, contacts a server.
+
+## Local workbench and workspace index
+
+`plug ui [--port N] [--workspace dir]` serves the playground on `127.0.0.1` only,
+rejects foreign Host and Origin headers, and allows one sandbox. Its workspace
+endpoints exist only locally; the hosted playground never offers them.
+
+`POST /api/discover`, also local only, lists an MCP server's tools over Streamable
+HTTP (initialize, paginated `tools/list`, end of session; never a tool call) or reads
+an A2A Agent Card at the given URL or its well-known locations (never a message). Up
+to eight request headers are used for that discovery only and are never stored,
+logged or returned; URLs are kept without credentials, query or fragment. It follows
+at most three redirects within the origin and stops at 15 seconds, 1 MB per response,
+20 pages or 500 tools. The author picks up to four listed tools or skills, which pass
+through the importers above.
+
+`plug index [dir] [--out file]` emits a `WorkspaceIndex`. The scan is bounded
+(2,000 files, 512 KB per file, 16 MB total, 500 findings), never follows symbolic
+links, skips `.env*`, key and certificate files, test files and dependency, build
+and test directories, records hostnames rather than URLs and opens no connection. Findings carry `static`
+evidence with a workspace-relative source location. Latency, quota, concurrency,
+change frequency, cache permission, scope, key completeness and delivery guarantees
+remain unknown and are listed as gaps. The draft system is adopted only by review.
 
 Sources: [MCP tools](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)
 and [A2A 1.0](https://a2a-protocol.org/v1.0.0/specification/).

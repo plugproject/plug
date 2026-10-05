@@ -4,9 +4,11 @@ import { parseDocument, visit, isAlias } from 'yaml';
 import * as validators from '../../../../schema/draft/validators.js';
 import type { ValidateFunction } from 'ajv';
 import type {
+  Connection,
   DesignInput,
   Fact,
   JsonObject,
+  Priority,
   SystemDescription,
 } from '../../../../schema/draft/schema';
 export type * from '../../../../schema/draft/schema';
@@ -102,26 +104,107 @@ export function compileOperationSchema(
       : new Ajv({ strict: false, strictSchema: true, validateFormats: false });
   return engine.compile(contract);
 }
-export function normalizeSystems(
-  systems: unknown,
-): [SystemDescription, SystemDescription] {
-  if (!Array.isArray(systems) || systems.length !== 2)
-    throw new Error('Exactly two systems are required');
+export function normalizeSystems(systems: unknown): SystemDescription[] {
+  if (!Array.isArray(systems) || systems.length < 2 || systems.length > 8)
+    throw new Error('Two to eight systems are required');
   for (const system of systems)
     assertContract<SystemDescription>('SystemDescription', system);
-  return structuredClone(systems) as [SystemDescription, SystemDescription];
+  return structuredClone(systems) as SystemDescription[];
 }
-export function validateInput(value: unknown): DesignInput {
+export const defaultPriorities: Priority[] = [
+  'correctness',
+  'latency',
+  'availability',
+  'simplicity',
+  'cost',
+];
+/** Lifts a 0.1-alpha.2 document mechanically; 0.2-alpha.1 documents pass through unchanged. */
+export function migrateInput(value: unknown): unknown {
+  guardDocument(value);
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    (value as { formatVersion?: unknown }).formatVersion !== '0.1-alpha.2'
+  )
+    return value;
+  const {
+    connection,
+    profile,
+    workload,
+    experience,
+    remainingPath,
+    preference,
+    systems,
+    infrastructure,
+    ...rest
+  } = structuredClone(value) as Record<string, unknown>;
+  if (Object.keys(rest).some((k) => k !== 'formatVersion'))
+    throw new Error('Unknown 0.1-alpha.2 fields cannot be migrated');
+  if (!connection || typeof connection !== 'object' || !experience)
+    throw new Error('0.1-alpha.2 document lacks a connection or experience');
+  const first = ['latency', 'cost', 'simplicity'].includes(String(preference))
+    ? (preference as Priority)
+    : 'latency';
+  return {
+    formatVersion: '0.2-alpha.1',
+    systems,
+    connections: [
+      {
+        id: 'primary',
+        ...(connection as object),
+        profile,
+        workload,
+        experience: {
+          ...(experience as object),
+          priorities: [
+            'correctness',
+            first,
+            ...defaultPriorities.filter(
+              (p) => p !== 'correctness' && p !== first,
+            ),
+          ],
+        },
+        remainingPath,
+      },
+    ],
+    infrastructure,
+  };
+}
+export function connectionById(
+  input: DesignInput,
+  connectionId?: string,
+): Connection {
+  const c = connectionId
+    ? input.connections.find((x) => x.id === connectionId)
+    : input.connections[0];
+  if (!c) throw new Error(`Unknown connection ${connectionId}`);
+  return c;
+}
+export function validateInput(raw: unknown): DesignInput {
+  const value = migrateInput(raw);
   assertContract<DesignInput>('DesignInput', value);
   const input = structuredClone(value),
-    { systems, connection: c, profile: p } = input;
+    { systems } = input;
+  if (new Set(systems.map((s) => s.id)).size !== systems.length)
+    throw new Error('System identities must be distinct');
   if (
-    systems[0].id === systems[1].id ||
-    c.callerSystemId === c.downstreamSystemId
+    new Set(input.connections.map((c) => c.id)).size !==
+    input.connections.length
   )
-    throw new Error(
-      'System identities and connection endpoints must be distinct',
-    );
+    throw new Error('Connection identities must be distinct');
+  const pairs = input.connections.map((c) =>
+    JSON.stringify([
+      c.callerSystemId,
+      c.callerOperationId,
+      c.downstreamSystemId,
+      c.downstreamOperationId,
+    ]),
+  );
+  if (new Set(pairs).size !== pairs.length)
+    throw new Error('Each connection must select a distinct operation pair');
+  for (const c of input.connections)
+    if (c.callerSystemId === c.downstreamSystemId)
+      throw new Error('Connection endpoints must be distinct systems');
   for (const system of systems) {
     if (
       new Set(system.operations.map((o) => o.id)).size !==
@@ -134,18 +217,6 @@ export function validateInput(value: unknown): DesignInput {
       if (!system.interfaces.some((i) => i.id === op.interfaceId))
         throw new Error('Operation references an unknown interface');
   }
-  const caller = systems
-    .find((s) => s.id === c.callerSystemId)
-    ?.operations.find((o) => o.id === c.callerOperationId);
-  const downstream = systems
-    .find((s) => s.id === c.downstreamSystemId)
-    ?.operations.find((o) => o.id === c.downstreamOperationId);
-  if (!caller || !downstream) throw new Error('Selected operation not found');
-  if (
-    p.systemId !== c.downstreamSystemId ||
-    p.operationId !== c.downstreamOperationId
-  )
-    throw new Error('Profile must describe the selected downstream operation');
   const checkFacts = (v: unknown): void => {
     if (!v || typeof v !== 'object') return;
     if ('value' in v && 'evidence' in v) {
@@ -158,19 +229,45 @@ export function validateInput(value: unknown): DesignInput {
     Object.values(v).forEach(checkFacts);
   };
   checkFacts(input);
-  const infra = input.infrastructure;
+  if (
+    input.infrastructure.cacheCapacity > 1000 ||
+    input.infrastructure.refreshConcurrency > 64
+  )
+    throw new Error('Analysis capacity exceeds alpha bounds');
+  for (const c of input.connections) validateConnection(input, c);
+  return input;
+}
+function validateConnection(input: DesignInput, c: Connection) {
+  const { systems } = input,
+    p = c.profile,
+    infra = input.infrastructure;
+  const caller = systems
+    .find((s) => s.id === c.callerSystemId)
+    ?.operations.find((o) => o.id === c.callerOperationId);
+  const downstream = systems
+    .find((s) => s.id === c.downstreamSystemId)
+    ?.operations.find((o) => o.id === c.downstreamOperationId);
+  if (!caller || !downstream) throw new Error('Selected operation not found');
+  if (
+    p.systemId !== c.downstreamSystemId ||
+    p.operationId !== c.downstreamOperationId
+  )
+    throw new Error('Profile must describe the selected downstream operation');
+  const priorities = c.experience.priorities ?? [];
+  if (new Set(priorities).size !== priorities.length)
+    throw new Error('Priorities must be distinct');
   for (const f of [
     p.timeoutMs,
     p.latencyMs,
     p.sourceLagMs,
     infra.schedulingAllowanceMs,
-    ...Object.values(input.remainingPath),
+    ...Object.values(c.remainingPath),
   ])
     if (f.value !== null && f.value > 86400000)
       throw new Error('Duration bounds exceed the supported one-day horizon');
   if (
-    input.experience.latencyTargetMs > 86400000 ||
-    (input.experience.finalDeadlineMs ?? 0) > 86400000
+    c.experience.latencyTargetMs > 86400000 ||
+    (c.experience.finalDeadlineMs ?? 0) > 86400000
   )
     throw new Error('UX timer exceeds the one-day horizon');
   if (p.concurrency.value !== null && p.concurrency.value > 64)
@@ -181,7 +278,7 @@ export function validateInput(value: unknown): DesignInput {
   )
     throw new Error('Key dimensions must be unique');
   const keyIds =
-    input.workload.prewarmKeys?.map((key) =>
+    c.workload.prewarmKeys?.map((key) =>
       JSON.stringify(
         Object.fromEntries(
           Object.entries(key).sort(([a], [b]) => a.localeCompare(b)),
@@ -195,18 +292,14 @@ export function validateInput(value: unknown): DesignInput {
     infra.refreshConcurrency,
     p.concurrency.value,
     p.responseBytes.value,
-    input.workload.keyCount.value,
+    c.workload.keyCount.value,
   ])
     if (n !== null && !Number.isInteger(n))
       throw new Error('Counts must be integers');
-  if (
-    infra.cacheCapacity > 1000 ||
-    infra.refreshConcurrency > 64 ||
-    (input.workload.prewarmKeys?.length ?? 0) > 100
-  )
+  if ((c.workload.prewarmKeys?.length ?? 0) > 100)
     throw new Error('Analysis capacity exceeds alpha bounds');
   let prev = -1;
-  for (const row of input.workload.trace ?? []) {
+  for (const row of c.workload.trace ?? []) {
     if (row.atMs < prev || row.atMs > 86400000)
       throw new Error('Trace must be ordered within a bounded day');
     prev = row.atMs;
@@ -223,10 +316,10 @@ export function validateInput(value: unknown): DesignInput {
     p.latencyMs.value > p.timeoutMs.value
   )
     throw new Error('Latency exceeds the declared hard bound');
-  return input;
 }
-export function selectedOperation(input: DesignInput) {
+export function selectedOperation(input: DesignInput, connectionId?: string) {
+  const c = connectionById(input, connectionId);
   return input.systems
-    .find((s) => s.id === input.connection.downstreamSystemId)!
-    .operations.find((o) => o.id === input.connection.downstreamOperationId)!;
+    .find((s) => s.id === c.downstreamSystemId)!
+    .operations.find((o) => o.id === c.downstreamOperationId)!;
 }

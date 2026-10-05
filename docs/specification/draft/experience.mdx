@@ -2,12 +2,25 @@
 title: Required experience
 ---
 
-The author specifies useful output, latency target, accepted age, correctness,
-latency scope, indicative-result permission, deferred-result permission, final
-deadline and allowed miss behavior. Latency scope is warmHits, trafficPercentile
-or everyRequest. Cache hits cannot certify every request because cold/expired
-states exist. A live requirement cannot be silently weakened to indicative output.
+Each connection states its experience. The author specifies useful output, latency
+target, accepted age, correctness, latency scope, indicative-result permission,
+deferred-result permission, final deadline and allowed miss behavior. Latency scope
+is warmHits, trafficPercentile or everyRequest. Cache hits cannot certify every
+request because cold/expired states exist. A live requirement cannot be silently
+weakened to indicative output.
+
+Optional goal fields are `firstAckMs`, `silenceBudgetMs`, `availabilityTarget`,
+`duplicateEffectForbidden`, `lostRequestAllowed`, `orderingRequired` and
+`priorities`. An absent field means no requirement was declared; an explicit `null`
+or `unknown` means the requirement itself is unknown and stays unknown. Duplicate
+effects and lost requests are forbidden unless declared acceptable. An
+acknowledgement is not useful output.
+
+Priorities are a distinct lexicographic order over `correctness`, `latency`,
+`availability`, `simplicity` and `cost`, defaulting to that order. They break ties
+only among non-dominated architectures and never trade away a security obligation.
 
 Traffic success is bounded by usable hits times independently evidenced within-target
 hit probability when misses are slow. Summing point estimates or percentiles does
 not establish that probability. Missing evidence remains a conditional claim.
+Warm-hit latency is never a traffic objective.

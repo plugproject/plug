@@ -1,0 +1,66 @@
+{
+  "formatVersion": "0.2-alpha.1",
+  "indexerVersion": "indexer-1",
+  "root": "inventory-service",
+  "scannedAt": "2026-10-04T00:00:00.000Z",
+  "fingerprint": "example",
+  "filesScanned": 2,
+  "truncated": false,
+  "findings": [
+    {
+      "kind": "interface",
+      "name": "express",
+      "detail": "HTTP server framework dependency",
+      "evidence": {
+        "kind": "static",
+        "note": "Declared dependency",
+        "source": {
+          "type": "package-manifest",
+          "location": "package.json"
+        }
+      }
+    }
+  ],
+  "system": {
+    "id": "inventory-service",
+    "name": "inventory-service",
+    "role": "current project",
+    "interfaces": [
+      {
+        "id": "http-server",
+        "protocol": "http",
+        "version": "1.1",
+        "direction": "exposes",
+        "binding": "HTTP+JSON"
+      }
+    ],
+    "operations": [
+      {
+        "id": "get-stock",
+        "interfaceId": "http-server",
+        "description": "GET /stock/{sku}",
+        "inputSchema": null,
+        "outputSchema": null,
+        "semantics": {
+          "effect": "read",
+          "idempotent": null,
+          "outputMeaning": null,
+          "cachePermission": null,
+          "scope": "unknown",
+          "keyDimensions": [],
+          "keysComplete": null,
+          "requiresLiveValidation": true,
+          "evidence": {
+            "kind": "static",
+            "note": "HTTP method semantics from the OpenAPI document; verify.",
+            "source": {
+              "type": "openapi",
+              "location": "openapi.yaml"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "gaps": ["get-stock: latency distribution and hard timeout"]
+}

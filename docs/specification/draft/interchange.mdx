@@ -1,0 +1,81 @@
+---
+title: Workflow interchange and IDE integration
+---
+
+A `DesignInput` is a directed graph: systems are groups, selected operations are
+nodes and each connection is an edge from its caller operation to its downstream
+operation. An edge carries that connection's experience, priorities, profile and
+workload. Layout is derived; coordinates are never serialized, so hashes do not
+depend on how the graph was drawn.
+
+## Open Workflow Specification export
+
+Plug writes [Open Workflow Specification](https://open-workflow-specification.org/)
+1.0.x documents as YAML or JSON. Export of the same input and design is
+byte-identical.
+
+- `document.dsl` is `1.0.3`, `namespace` is `plug`, `version` is `0.1.0` and the
+  name is derived from the first caller system.
+- `document.metadata.plug` is a `WorkflowSpecMetadata`: the canonical input and,
+  only when the supplied analysis has the same input hash, the input and design
+  hashes and the selected architecture of each connection. A stale analysis is
+  rejected rather than exported.
+- `do` holds one call task per connection, in connection order, named by the
+  connection ID. HTTP, MCP and A2A downstream interfaces become `call: http`,
+  `call: mcp` (`tools/call`) and `call: a2a` (`message/send`). A declared
+  endpoint is copied; otherwise the endpoint is
+  `plug://systems/<system>/operations/<operation>`. A known hard timeout becomes
+  the task `timeout`.
+- Each task's `metadata.plug` is a `WorkflowTaskMetadata` with the connection's
+  endpoints, priorities and latency target.
+
+## Import
+
+Import parses only. It never fetches, resolves or calls an endpoint, Agent Card,
+MCP server or command in the document. Documents larger than 256 KB, or that would
+produce more than eight systems, twelve connections or four operations per system,
+are rejected with their counts.
+
+A document with valid `metadata.plug` is reconciled against its task list:
+connections keep their canonical facts, follow the task order and are removed when
+their task is removed; edited task priorities and latency targets win. The import
+is `lossless` only when nothing was reconciled.
+
+Call tasks without Plug metadata are drafted. The workflow becomes the caller
+system; each endpoint host, MCP server or A2A agent becomes a downstream system,
+keeping host names only. Every operational fact of a drafted connection is unknown.
+A task timeout is a declared hard bound, and HTTP `GET` or `HEAD` is static read
+evidence, never cache permission. The placeholder experience, unmapped call types
+and unmodeled control flow are reported as gaps for the author to resolve.
+
+## Workspace spec bundle
+
+`plug spec` and the local workbench write `<workspace>/.plug/`:
+
+| File                | Content                                   |
+| ------------------- | ----------------------------------------- |
+| `workflow.yaml`     | The exported workflow; the spec of record |
+| `design-input.json` | The canonical input                       |
+| `design.json`       | The `DesignRecommendation`                |
+| `design.md`         | Explanation and implementation tasks      |
+| `AGENTS.md`         | Guide for coding agents                   |
+
+Each file is written to a temporary sibling and renamed. Plug never edits other
+repository files, including a root `AGENTS.md`. Readers must treat the bundle as
+consistent only when `design.json` was computed for `design-input.json` and
+`workflow.yaml` imports losslessly; otherwise the workflow was edited and must be
+re-applied with `plug spec` or `plug_update_spec`. The hosted playground offers the
+workflow as a download only and has no workspace endpoints.
+
+## MCP server
+
+`plug mcp` serves one workspace over stdio and never listens on a port. Its tools
+are `plug_get_spec`, `plug_update_spec`, `plug_analyze`, `plug_index_workspace` and
+`plug_explain`; the bundle files are resources under `plug://spec/`. Updates go
+through the same validation, reconciliation and analysis as any other input.
+Arguments are limited to 256 KB, and every call reads the workspace again.
+
+`plug mcp install` writes a `plug` entry into project-scoped configuration only
+(`.cursor/mcp.json`, `.vscode/mcp.json` or `.mcp.json`), keeps every other entry
+and refuses to rewrite a file it cannot parse. See
+[SEP-0000](/seps/0000-workflow-graph-and-openspec).

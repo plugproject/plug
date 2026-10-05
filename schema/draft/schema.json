@@ -3,8 +3,8 @@
   "definitions": {
     "FormatVersion": {
       "type": "string",
-      "const": "0.1-alpha.2",
-      "description": "Plug alpha public serialized contracts. Replaces the earlier alpha draft."
+      "const": "0.2-alpha.1",
+      "description": "Plug public serialized contracts. 0.2-alpha.1 replaces 0.1-alpha.2; migrate older documents with migrateInput."
     },
     "Quantity": {
       "type": "number",
@@ -17,6 +17,16 @@
       "description": "A probability, never a percentage in the 0–100 range.",
       "minimum": 0,
       "maximum": 1
+    },
+    "Ordinal": {
+      "type": "number",
+      "enum": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "description": "Ordinal trade-off level: 0 none, 1 low, 2 medium, 3 high."
     },
     "JsonValue": {
       "anyOf": [
@@ -61,8 +71,10 @@
             "declared",
             "observed",
             "synthetic",
+            "static",
             "unknown"
-          ]
+          ],
+          "description": "`static` facts are parsed from local code, configuration or contract files."
         },
         "note": {
           "type": "string"
@@ -75,6 +87,26 @@
         },
         "windowMs": {
           "$ref": "#/definitions/Quantity"
+        },
+        "source": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string"
+            },
+            "location": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "location"
+          ],
+          "additionalProperties": false,
+          "description": "Where the fact came from, e.g. a workspace-relative file path."
+        },
+        "confidence": {
+          "$ref": "#/definitions/Fraction"
         }
       },
       "required": [
@@ -224,6 +256,20 @@
         "requiresLiveValidation": {
           "type": "boolean"
         },
+        "reversible": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "Completed effects have a domain inverse or compensation."
+        },
+        "idempotencyKeySupported": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "The operation accepts a caller-supplied idempotency key."
+        },
         "evidence": {
           "$ref": "#/definitions/Evidence"
         }
@@ -240,6 +286,46 @@
         "evidence"
       ],
       "additionalProperties": false
+    },
+    "Interaction": {
+      "type": "object",
+      "properties": {
+        "callback": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "polling": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "streaming": {
+          "type": "string",
+          "enum": [
+            "none",
+            "server",
+            "bidi",
+            "unknown"
+          ]
+        },
+        "cancellation": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "callback",
+        "polling",
+        "streaming",
+        "cancellation"
+      ],
+      "additionalProperties": false,
+      "description": "How a later result can reach the caller."
     },
     "Operation": {
       "type": "object",
@@ -276,6 +362,9 @@
         "semantics": {
           "$ref": "#/definitions/Semantics"
         },
+        "interaction": {
+          "$ref": "#/definitions/Interaction"
+        },
         "metadata": {
           "$ref": "#/definitions/JsonObject"
         }
@@ -289,6 +378,50 @@
         "semantics"
       ],
       "additionalProperties": false
+    },
+    "Messaging": {
+      "type": "object",
+      "properties": {
+        "delivery": {
+          "type": "string",
+          "enum": [
+            "at-most-once",
+            "at-least-once",
+            "exactly-once-claimed",
+            "none",
+            "unknown"
+          ]
+        },
+        "ordering": {
+          "type": "string",
+          "enum": [
+            "none",
+            "key",
+            "global",
+            "unknown"
+          ]
+        },
+        "durable": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "dlq": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "delivery",
+        "ordering",
+        "durable",
+        "dlq"
+      ],
+      "additionalProperties": false,
+      "description": "Delivery behavior of the channel through which this system is reached. `none` means synchronous request-reply."
     },
     "SystemDescription": {
       "type": "object",
@@ -313,9 +446,19 @@
           "items": {
             "$ref": "#/definitions/Operation"
           },
-          "description": "Alpha accepts up to four selected operations per system.",
+          "description": "Up to four selected operations per system.",
           "maxItems": 4,
           "minItems": 1
+        },
+        "trustDomain": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Identity/trust domain; differing domains cross a trust boundary."
+        },
+        "messaging": {
+          "$ref": "#/definitions/Messaging"
         },
         "metadata": {
           "$ref": "#/definitions/JsonObject"
@@ -390,6 +533,10 @@
             "unknown",
             "available"
           ]
+        },
+        "availability": {
+          "$ref": "#/definitions/RateFact",
+          "description": "Fraction of calls that succeed within the timeout."
         }
       },
       "required": [
@@ -440,6 +587,10 @@
       "properties": {
         "requestsPerMinute": {
           "$ref": "#/definitions/Fact"
+        },
+        "burstPerMinute": {
+          "$ref": "#/definitions/Fact",
+          "description": "Peak request rate within any one minute."
         },
         "hotKeyShare": {
           "$ref": "#/definitions/RateFact"
@@ -510,6 +661,16 @@
         "measurementStartMs"
       ],
       "additionalProperties": false
+    },
+    "Priority": {
+      "type": "string",
+      "enum": [
+        "correctness",
+        "latency",
+        "availability",
+        "simplicity",
+        "cost"
+      ]
     },
     "Experience": {
       "type": "object",
@@ -643,6 +804,60 @@
             }
           ],
           "description": "Optional independently available useful initial result. Acknowledgements do not qualify."
+        },
+        "priorities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Priority"
+          },
+          "description": "Distinct lexicographic ranking order applied after hard constraints.",
+          "maxItems": 5
+        },
+        "firstAckMs": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Quantity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Budget for a first acknowledgement; an acknowledgement is not useful output."
+        },
+        "silenceBudgetMs": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Quantity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Longest acceptable period without any feedback."
+        },
+        "availabilityTarget": {
+          "$ref": "#/definitions/RateFact"
+        },
+        "duplicateEffectForbidden": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "lostRequestAllowed": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "orderingRequired": {
+          "type": "string",
+          "enum": [
+            "none",
+            "perKey",
+            "global",
+            "unknown"
+          ]
         }
       },
       "required": [
@@ -660,7 +875,8 @@
         "hitsWithinTargetMs",
         "initialOutput"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "Required experience and interaction goal. Absent optional requirements mean none was declared."
     },
     "Infrastructure": {
       "type": "object",
@@ -742,6 +958,105 @@
       ],
       "additionalProperties": false
     },
+    "FieldMapping": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to"
+      ],
+      "additionalProperties": false
+    },
+    "Connection": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "callerSystemId": {
+          "type": "string"
+        },
+        "callerOperationId": {
+          "type": "string"
+        },
+        "downstreamSystemId": {
+          "type": "string"
+        },
+        "downstreamOperationId": {
+          "type": "string"
+        },
+        "inputMapping": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FieldMapping"
+          }
+        },
+        "outputMapping": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FieldMapping"
+          }
+        },
+        "adapter": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "supplied": {
+                  "type": "boolean"
+                },
+                "overheadMs": {
+                  "$ref": "#/definitions/Fact"
+                }
+              },
+              "required": [
+                "supplied",
+                "overheadMs"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "profile": {
+          "$ref": "#/definitions/SystemProfile"
+        },
+        "workload": {
+          "$ref": "#/definitions/Workload"
+        },
+        "experience": {
+          "$ref": "#/definitions/Experience"
+        },
+        "remainingPath": {
+          "$ref": "#/definitions/RemainingPath"
+        }
+      },
+      "required": [
+        "id",
+        "callerSystemId",
+        "callerOperationId",
+        "downstreamSystemId",
+        "downstreamOperationId",
+        "inputMapping",
+        "outputMapping",
+        "adapter",
+        "profile",
+        "workload",
+        "experience",
+        "remainingPath"
+      ],
+      "additionalProperties": false,
+      "description": "One caller-to-downstream connection with its own facts and goal."
+    },
     "DesignInput": {
       "type": "object",
       "properties": {
@@ -753,132 +1068,29 @@
           "items": {
             "$ref": "#/definitions/SystemDescription"
           },
+          "description": "Two to eight systems.",
           "minItems": 2,
-          "maxItems": 2,
-          "description": "Exactly two systems."
+          "maxItems": 8
         },
-        "connection": {
-          "type": "object",
-          "properties": {
-            "callerSystemId": {
-              "type": "string"
-            },
-            "callerOperationId": {
-              "type": "string"
-            },
-            "downstreamSystemId": {
-              "type": "string"
-            },
-            "downstreamOperationId": {
-              "type": "string"
-            },
-            "inputMapping": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "from": {
-                    "type": "string"
-                  },
-                  "to": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "from",
-                  "to"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "outputMapping": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "from": {
-                    "type": "string"
-                  },
-                  "to": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "from",
-                  "to"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "adapter": {
-              "anyOf": [
-                {
-                  "type": "object",
-                  "properties": {
-                    "supplied": {
-                      "type": "boolean"
-                    },
-                    "overheadMs": {
-                      "$ref": "#/definitions/Fact"
-                    }
-                  },
-                  "required": [
-                    "supplied",
-                    "overheadMs"
-                  ],
-                  "additionalProperties": false
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            }
+        "connections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Connection"
           },
-          "required": [
-            "callerSystemId",
-            "callerOperationId",
-            "downstreamSystemId",
-            "downstreamOperationId",
-            "inputMapping",
-            "outputMapping",
-            "adapter"
-          ],
-          "additionalProperties": false
-        },
-        "profile": {
-          "$ref": "#/definitions/SystemProfile"
-        },
-        "workload": {
-          "$ref": "#/definitions/Workload"
-        },
-        "experience": {
-          "$ref": "#/definitions/Experience"
+          "description": "One to twelve connections; operations may take part in several.",
+          "minItems": 1,
+          "maxItems": 12
         },
         "infrastructure": {
-          "$ref": "#/definitions/Infrastructure"
-        },
-        "remainingPath": {
-          "$ref": "#/definitions/RemainingPath"
-        },
-        "preference": {
-          "type": "string",
-          "enum": [
-            "latency",
-            "cost",
-            "simplicity"
-          ]
+          "$ref": "#/definitions/Infrastructure",
+          "description": "Shared by every connection."
         }
       },
       "required": [
         "formatVersion",
         "systems",
-        "connection",
-        "profile",
-        "workload",
-        "experience",
-        "infrastructure",
-        "remainingPath",
-        "preference"
+        "connections",
+        "infrastructure"
       ],
       "additionalProperties": false
     },
@@ -1328,22 +1540,620 @@
       ],
       "additionalProperties": false
     },
-    "DesignRecommendation": {
+    "RelationPredicate": {
+      "type": "string",
+      "enum": [
+        "protocolCompatible",
+        "contractCompatible",
+        "semanticMatch",
+        "deadlineRisk",
+        "firstResponseGap",
+        "capacityMismatch",
+        "burstMismatch",
+        "availabilityShortfall",
+        "sideEffecting",
+        "unsafeRetry",
+        "duplicateDeliveryPossible",
+        "duplicateEffectRisk",
+        "atomicPublishRequired",
+        "orderingGap",
+        "globalOrderingRequired",
+        "laterResultPath",
+        "deferredAllowed",
+        "trustBoundaryCrossed"
+      ],
+      "description": "Names of the derived pairwise predicates."
+    },
+    "RelationFact": {
       "type": "object",
       "properties": {
-        "formatVersion": {
-          "$ref": "#/definitions/FormatVersion"
+        "value": {
+          "type": [
+            "boolean",
+            "null"
+          ]
         },
-        "catalogVersion": {
+        "reason": {
           "type": "string"
         },
-        "catalogHash": {
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          }
+        }
+      },
+      "required": [
+        "value",
+        "reason",
+        "evidence"
+      ],
+      "additionalProperties": false,
+      "description": "Three-valued predicate: null means unknown, never false."
+    },
+    "RelationFacts": {
+      "type": "object",
+      "properties": {
+        "protocolCompatible": {
+          "$ref": "#/definitions/RelationFact"
+        },
+        "contractCompatible": {
+          "$ref": "#/definitions/RelationFact"
+        },
+        "semanticMatch": {
+          "$ref": "#/definitions/RelationFact"
+        },
+        "deadlineRisk": {
+          "$ref": "#/definitions/RelationFact"
+        },
+        "firstResponseGap": {
+          "$ref": "#/definitions/RelationFact"
+        },
+        "capacityMismatch": {
+          "$ref": "#/definitions/RelationFact"
+        },
+        "burstMismatch": {
+          "$ref": "#/definitions/RelationFact"
+        },
+        "availabilityShortfall": {
+          "$ref": "#/definitions/RelationFact"
+        },
+        "sideEffecting": {
+          "$ref": "#/definitions/RelationFact"
+        },
+        "unsafeRetry": {
+          "$ref": "#/definitions/RelationFact"
+        },
+        "duplicateDeliveryPossible": {
+          "$ref": "#/definitions/RelationFact"
+        },
+        "duplicateEffectRisk": {
+          "$ref": "#/definitions/RelationFact"
+        },
+        "atomicPublishRequired": {
+          "$ref": "#/definitions/RelationFact"
+        },
+        "orderingGap": {
+          "$ref": "#/definitions/RelationFact"
+        },
+        "globalOrderingRequired": {
+          "$ref": "#/definitions/RelationFact"
+        },
+        "laterResultPath": {
+          "$ref": "#/definitions/RelationFact"
+        },
+        "deferredAllowed": {
+          "$ref": "#/definitions/RelationFact"
+        },
+        "trustBoundaryCrossed": {
+          "$ref": "#/definitions/RelationFact"
+        }
+      },
+      "required": [
+        "protocolCompatible",
+        "contractCompatible",
+        "semanticMatch",
+        "deadlineRisk",
+        "firstResponseGap",
+        "capacityMismatch",
+        "burstMismatch",
+        "availabilityShortfall",
+        "sideEffecting",
+        "unsafeRetry",
+        "duplicateDeliveryPossible",
+        "duplicateEffectRisk",
+        "atomicPublishRequired",
+        "orderingGap",
+        "globalOrderingRequired",
+        "laterResultPath",
+        "deferredAllowed",
+        "trustBoundaryCrossed"
+      ],
+      "additionalProperties": false
+    },
+    "Condition": {
+      "type": "object",
+      "properties": {
+        "fact": {
+          "$ref": "#/definitions/RelationPredicate"
+        },
+        "is": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "fact",
+        "is"
+      ],
+      "additionalProperties": false
+    },
+    "PatternFamily": {
+      "type": "string",
+      "enum": [
+        "interaction",
+        "cache",
+        "mediation",
+        "resilience",
+        "flow-control",
+        "delivery",
+        "consistency",
+        "security",
+        "global"
+      ]
+    },
+    "PatternTradeoffs": {
+      "type": "object",
+      "properties": {
+        "consistencyWeakening": {
+          "$ref": "#/definitions/Ordinal"
+        },
+        "runtimeCoupling": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Ordinal"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Remaining runtime coupling to the downstream; null leaves coupling unchanged."
+        },
+        "operationalComplexity": {
+          "$ref": "#/definitions/Ordinal"
+        },
+        "statefulness": {
+          "$ref": "#/definitions/Ordinal"
+        }
+      },
+      "required": [
+        "consistencyWeakening",
+        "runtimeCoupling",
+        "operationalComplexity",
+        "statefulness"
+      ],
+      "additionalProperties": false
+    },
+    "PatternDefinition": {
+      "type": "object",
+      "properties": {
+        "id": {
           "type": "string"
         },
-        "inputHash": {
+        "title": {
           "type": "string"
         },
-        "designHash": {
+        "family": {
+          "$ref": "#/definitions/PatternFamily"
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "pairwise",
+            "global"
+          ]
+        },
+        "template": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PatternId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Seed designs carry their detailed evaluator template."
+        },
+        "preconditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Condition"
+          },
+          "description": "All must hold."
+        },
+        "contraindications": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Condition"
+          },
+          "description": "Any holding contraindicates the pattern."
+        },
+        "requiresOneOf": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Condition"
+          },
+          "description": "At least one must hold when nonempty."
+        },
+        "solves": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "introduces": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "conflicts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "composesWith": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tradeoffs": {
+          "$ref": "#/definitions/PatternTradeoffs"
+        },
+        "evidenceNeeds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tasks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "executableHere": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "family",
+        "scope",
+        "template",
+        "preconditions",
+        "contraindications",
+        "requiresOneOf",
+        "solves",
+        "introduces",
+        "conflicts",
+        "composesWith",
+        "components",
+        "tradeoffs",
+        "evidenceNeeds",
+        "tasks",
+        "executableHere"
+      ],
+      "additionalProperties": false,
+      "description": "A pattern as versioned, machine-readable knowledge."
+    },
+    "ObligationDefinition": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "dischargedBy": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Condition"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "description",
+        "dischargedBy"
+      ],
+      "additionalProperties": false,
+      "description": "An obligation a pattern introduces; any holding condition discharges it."
+    },
+    "Applicability": {
+      "type": "string",
+      "enum": [
+        "required",
+        "supported",
+        "optional",
+        "contraindicated",
+        "not_applicable",
+        "unknown",
+        "needs_global_context"
+      ]
+    },
+    "PatternEvaluation": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "applicability": {
+          "$ref": "#/definitions/Applicability"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "facts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RelationPredicate"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "applicability",
+        "reason",
+        "facts"
+      ],
+      "additionalProperties": false
+    },
+    "TradeoffVector": {
+      "type": "object",
+      "properties": {
+        "usefulLatencyMs": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Quantity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "trafficSuccessRate": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Fraction"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "costPerMinute": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Quantity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "consistencyWeakening": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "runtimeCoupling": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "operationalComplexity": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "statefulness": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "componentCount": {
+          "$ref": "#/definitions/Quantity"
+        }
+      },
+      "required": [
+        "usefulLatencyMs",
+        "trafficSuccessRate",
+        "costPerMinute",
+        "consistencyWeakening",
+        "runtimeCoupling",
+        "operationalComplexity",
+        "statefulness",
+        "componentCount"
+      ],
+      "additionalProperties": false
+    },
+    "ObligationStatus": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "coveredBy": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "dischargedBy": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RelationPredicate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "coveredBy",
+        "dischargedBy"
+      ],
+      "additionalProperties": false
+    },
+    "ArchitectureProof": {
+      "type": "object",
+      "properties": {
+        "because": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "rejectedAlternatives": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "reason"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "unknowns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "because",
+        "rejectedAlternatives",
+        "unknowns"
+      ],
+      "additionalProperties": false
+    },
+    "ArchitectureCandidate": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "base": {
+          "$ref": "#/definitions/PatternId"
+        },
+        "patterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "status": {
+          "$ref": "#/definitions/CandidateStatus"
+        },
+        "frontier": {
+          "type": "boolean"
+        },
+        "dominatedBy": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "problems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "solvedBy": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "solvedBy"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "obligations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ObligationStatus"
+          }
+        },
+        "tradeoffs": {
+          "$ref": "#/definitions/TradeoffVector"
+        },
+        "proof": {
+          "$ref": "#/definitions/ArchitectureProof"
+        },
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "diagram": {
+          "type": "string"
+        },
+        "tasks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "executableHere": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "base",
+        "patterns",
+        "status",
+        "frontier",
+        "dominatedBy",
+        "problems",
+        "obligations",
+        "tradeoffs",
+        "proof",
+        "components",
+        "diagram",
+        "tasks",
+        "executableHere"
+      ],
+      "additionalProperties": false,
+      "description": "A closed pattern stack built on one seed base design."
+    },
+    "ConnectionReport": {
+      "type": "object",
+      "properties": {
+        "connectionId": {
           "type": "string"
         },
         "selectedId": {
@@ -1362,6 +2172,37 @@
             "$ref": "#/definitions/Candidate"
           }
         },
+        "relation": {
+          "$ref": "#/definitions/RelationFacts"
+        },
+        "patterns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PatternEvaluation"
+          }
+        },
+        "architectures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ArchitectureCandidate"
+          }
+        },
+        "selectedArchitectureId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "policyDecisionNeeded": {
+          "type": "boolean",
+          "description": "Two or more feasible frontier architectures tie on every declared priority."
+        },
+        "priorities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Priority"
+          }
+        },
         "missingInformation": {
           "type": "array",
           "items": {
@@ -1373,17 +2214,191 @@
         }
       },
       "required": [
+        "connectionId",
+        "selectedId",
+        "candidates",
+        "relation",
+        "patterns",
+        "architectures",
+        "selectedArchitectureId",
+        "policyDecisionNeeded",
+        "priorities",
+        "missingInformation",
+        "costRankingAvailable"
+      ],
+      "additionalProperties": false
+    },
+    "DesignRecommendation": {
+      "type": "object",
+      "properties": {
+        "formatVersion": {
+          "$ref": "#/definitions/FormatVersion"
+        },
+        "catalogVersion": {
+          "type": "string"
+        },
+        "catalogHash": {
+          "type": "string"
+        },
+        "inputHash": {
+          "type": "string"
+        },
+        "designHash": {
+          "type": "string"
+        },
+        "connections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ConnectionReport"
+          }
+        },
+        "crossConnection": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Criterion"
+          }
+        },
+        "missingInformation": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
         "formatVersion",
         "catalogVersion",
         "catalogHash",
         "inputHash",
         "designHash",
-        "selectedId",
-        "candidates",
-        "missingInformation",
-        "costRankingAvailable"
+        "connections",
+        "crossConnection",
+        "missingInformation"
       ],
       "additionalProperties": false
+    },
+    "WorkflowSpecMetadata": {
+      "type": "object",
+      "properties": {
+        "formatVersion": {
+          "$ref": "#/definitions/FormatVersion"
+        },
+        "input": {
+          "$ref": "#/definitions/DesignInput",
+          "description": "Canonical input; importers re-validate it and reconcile it with the task list."
+        },
+        "design": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "inputHash": {
+                  "type": "string"
+                },
+                "designHash": {
+                  "type": "string"
+                },
+                "catalogVersion": {
+                  "type": "string"
+                },
+                "selected": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "connectionId": {
+                        "type": "string"
+                      },
+                      "patternId": {
+                        "anyOf": [
+                          {
+                            "$ref": "#/definitions/PatternId"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "architectureId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "connectionId",
+                      "patternId",
+                      "architectureId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "maxItems": 12
+                }
+              },
+              "required": [
+                "inputHash",
+                "designHash",
+                "catalogVersion",
+                "selected"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The analysis exported with the workflow, only when it was computed for this exact input."
+        }
+      },
+      "required": [
+        "formatVersion",
+        "input",
+        "design"
+      ],
+      "additionalProperties": false,
+      "description": "Plug data under `document.metadata.plug` of an exported Open Workflow Specification document."
+    },
+    "WorkflowTaskMetadata": {
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string"
+        },
+        "callerSystemId": {
+          "type": "string"
+        },
+        "callerOperationId": {
+          "type": "string"
+        },
+        "downstreamSystemId": {
+          "type": "string"
+        },
+        "downstreamOperationId": {
+          "type": "string"
+        },
+        "priorities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Priority"
+          },
+          "maxItems": 5
+        },
+        "latencyTargetMs": {
+          "$ref": "#/definitions/Quantity"
+        }
+      },
+      "required": [
+        "connectionId",
+        "callerSystemId",
+        "callerOperationId",
+        "downstreamSystemId",
+        "downstreamOperationId",
+        "priorities",
+        "latencyTargetMs"
+      ],
+      "additionalProperties": false,
+      "description": "Plug data under `metadata.plug` of each exported call task."
     },
     "DemoEvent": {
       "type": "object",
@@ -1484,6 +2499,110 @@
       ],
       "additionalProperties": false,
       "description": "Fixed trusted-local HTTP response envelope; data is checked against the selected output contract."
+    },
+    "WorkspaceFinding": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "interface",
+            "operation",
+            "schema",
+            "agent-card",
+            "mcp",
+            "broker",
+            "cache",
+            "scheduler",
+            "resilience",
+            "idempotency",
+            "tracing",
+            "auth"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "detail": {
+          "type": "string"
+        },
+        "evidence": {
+          "$ref": "#/definitions/Evidence"
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "detail",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "WorkspaceIndex": {
+      "type": "object",
+      "properties": {
+        "formatVersion": {
+          "$ref": "#/definitions/FormatVersion"
+        },
+        "indexerVersion": {
+          "type": "string"
+        },
+        "root": {
+          "type": "string",
+          "description": "Directory name only; absolute paths are never serialized."
+        },
+        "scannedAt": {
+          "type": "string"
+        },
+        "fingerprint": {
+          "type": "string",
+          "description": "Hash of scanned relative paths and contents, used for freshness."
+        },
+        "filesScanned": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorkspaceFinding"
+          },
+          "maxItems": 500
+        },
+        "system": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/SystemDescription"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Draft description for review; null when no operation was found."
+        },
+        "gaps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "formatVersion",
+        "indexerVersion",
+        "root",
+        "scannedAt",
+        "fingerprint",
+        "filesScanned",
+        "truncated",
+        "findings",
+        "system",
+        "gaps"
+      ],
+      "additionalProperties": false,
+      "description": "Structural facts from a bounded local scan. Operational facts remain unknown and are listed in gaps."
     }
   }
 }

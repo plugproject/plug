@@ -127,7 +127,9 @@ export function createApp(
     }
     const input = flightInput(),
       report = suggestDesign(input),
-      candidate = report.candidates.find((c) => c.id === body.pattern);
+      candidate = report.connections[0].candidates.find(
+        (c) => c.id === body.pattern,
+      );
     if (body.designHash !== report.designHash || !candidate?.executableHere) {
       res.status(409).json({
         error:
@@ -175,7 +177,7 @@ export function createApp(
       if (!res.write(line)) sessions.get(id)?.runner.stop('slow-consumer');
     };
     send({
-      formatVersion: '0.1-alpha.2',
+      formatVersion: '0.2-alpha.1',
       type: 'session',
       atMs: Date.now(),
       sessionId: id,
@@ -250,7 +252,7 @@ export function createApp(
     else if (body.action === 'fail-next-refresh') {
       session.fixture.fail();
       session.send({
-        formatVersion: '0.1-alpha.2',
+        formatVersion: '0.2-alpha.1',
         type: 'fault-armed',
         atMs: Date.now(),
         actionId,
@@ -260,7 +262,7 @@ export function createApp(
     } else {
       const version = session.fixture.change();
       session.send({
-        formatVersion: '0.1-alpha.2',
+        formatVersion: '0.2-alpha.1',
         type: 'data-change',
         atMs: Date.now(),
         actionId,

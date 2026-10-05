@@ -2,6 +2,9 @@ import { build } from 'esbuild';
 import {
   mkdirSync,
   copyFileSync,
+  cpSync,
+  existsSync,
+  rmSync,
   writeFileSync,
   readdirSync,
   readFileSync,
@@ -47,6 +50,10 @@ writeFileSync(
 );
 copyFileSync('schema/draft/schema.json', 'packages/plug/dist/schema.json');
 copyFileSync('LICENSE', 'packages/plug/LICENSE');
+if (!existsSync('apps/playground/dist/index.html'))
+  throw new Error('Build the playground before packaging the workbench UI');
+rmSync('packages/plug/dist/ui', { recursive: true, force: true });
+cpSync('apps/playground/dist', 'packages/plug/dist/ui', { recursive: true });
 mkdirSync('dist', { recursive: true });
 await build({
   entryPoints: ['apps/playground/server.ts'],

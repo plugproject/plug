@@ -1,6 +1,6 @@
 {
   "name": "@plugproject/plug",
-  "version": "0.1.0-alpha.2",
+  "version": "0.2.0-alpha.1",
   "type": "module",
   "license": "UNLICENSED",
   "private": true,
@@ -25,7 +25,9 @@
     "LICENSE"
   ],
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.0",
     "ajv": "8.20.0",
-    "yaml": "2.9.1"
+    "yaml": "2.9.1",
+    "zod": "4.6.5"
   }
 }

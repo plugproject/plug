@@ -7,3 +7,7 @@ export declare const DemoEvent: ValidateFunction;
 export declare const SystemDescription: ValidateFunction;
 export declare const RunnerConfig: ValidateFunction;
 export declare const SourceResponse: ValidateFunction;
+export declare const WorkspaceIndex: ValidateFunction;
+export declare const PatternDefinition: ValidateFunction;
+export declare const WorkflowSpecMetadata: ValidateFunction;
+export declare const WorkflowTaskMetadata: ValidateFunction;

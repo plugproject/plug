@@ -2,8 +2,10 @@
 title: Concepts
 ---
 
-A fact records declared, observed, synthetic or unknown evidence. Unknown is a null
-value, never zero. Latency point estimates cannot prove end-to-end percentiles.
+A fact records declared, observed, synthetic, static or unknown evidence. Static
+evidence comes from a local workspace scan and names its source file. Unknown is a
+null value, never zero; a relation fact derived from an unknown stays unknown rather
+than false. Latency point estimates cannot prove end-to-end percentiles.
 Result age is time since source snapshot (including delivery allowance). Change
 frequency is a heuristic; it is not a correctness guarantee. Cache permission,
 complete keys, and sharing scope must be explicit.

@@ -3,7 +3,7 @@ import { runDemo } from '../../packages/plug/src/demo/runtime';
 import { startFixture } from '../../packages/plug/src/demo/fixture';
 import { suggestDesign } from '../../packages/plug/src/recommender/index';
 const input = flightInput(),
-  report = suggestDesign(input),
+  report = suggestDesign(input).connections[0],
   fixture = await startFixture();
 const runner = runDemo(
   report.candidates.find((c) => c.id === report.selectedId)!,

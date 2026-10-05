@@ -1,0 +1,257 @@
+---
+title: Workflow graph editor, Open Workflow Specification interchange and IDE integration
+status: draft
+---
+
+This proposal has no PR number, sponsor or approval yet. It builds on the local
+workbench and multi-system proposal and changes the serialized format bounds.
+
+## Motivation
+
+The workbench describes systems with cards and the required experience with one
+form per connection. Three gaps remain:
+
+1. Forms hide the shape of an integration. With several systems and
+   connections a developer cannot see which operation calls which, and which
+   experience each connection must deliver.
+2. Integration intent lives in other tools. Teams already write workflow
+   definitions; Plug can neither read them nor hand its result back in a
+   standard form.
+3. The analysis ends in the browser. The coding agent in the developer's IDE
+   never sees the spec Plug produced, and Plug never hears when the agent
+   changes the code that the spec describes.
+
+## Specification
+
+### Workflow graph
+
+The workbench edits a `DesignInput` as a graph. Each system is a group; each
+selected operation is a node inside its group; each `Connection` is a directed
+edge from the caller operation to the downstream operation. The edge carries
+that connection's `experience`, `profile`, `workload` and `remainingPath`, and
+shows its priority order. Exactly one element is selected at a time, and the
+selection is the inspector's subject: selecting an edge, by its line or its
+badge, opens that connection's required experience, priorities and profile;
+the badge's edit button brings the required experience into view. Selecting a
+node opens the operation's semantics.
+
+Elements can be created at every level. Double-clicking empty canvas adds a
+system; double-clicking inside a system adds an operation to it. Hovering or
+focusing an operation shows a + connector on each side. Dragging the connector
+after an operation onto any part of an operation of another system creates a
+connection whose operational facts are unknown; the connector before an
+operation draws the connection from its caller. Possible targets are
+highlighted while dragging, and a refused target states why. Ending the drag on
+empty canvas adds a new system already wired to the dragged operation. Clicking
+a connector instead lists every operation it can still call or serve, and a new
+system, and connects the one chosen. Add connection is a mode rather than an
+action: the author clicks the calling operation, or a connector to choose the
+direction, then the operation at the other end; a preview line follows the
+pointer, refused targets are dimmed with their reason, and Escape or a click on
+empty canvas leaves the mode. Each operation may call and serve as many
+operations of other systems as the bounds allow.
+Dragging an edge's end onto another operation rewires it: a new caller clears
+the input and output mappings, and a new downstream operation resets the
+connection's operational facts to unknown, as retargeting does.
+
+Operations can change systems. Dropping an operation on another system moves it
+there; dropping it on empty canvas puts it in a new system whose interface
+copies the operation's interface without its endpoint. The operation keeps its
+semantics and takes a fresh ID only when the target already uses it. Its
+connections follow the same rules as rewiring: where it is the caller, mappings
+are cleared; where it is the downstream operation, operational facts become
+unknown. A move is refused, with the reason shown while dragging, when the
+target is at a bound or when the operation is connected to the target system,
+since a connection joins two different systems. A refused drop returns the
+operation to its place. Moving a system's last operation away leaves the system
+empty.
+
+Anything can be removed. Removing a connection removes only it, including the
+last one; removing an operation also removes every connection that touches it;
+removing a system removes its operations and their connections. The canvas
+states what was removed with it, and undo restores it. While being edited the
+graph may therefore be a draft: fewer than two systems, a system without
+operations, or no connection. The editor lists what the draft lacks and
+disables analysis, workflow download and writing the workspace bundle until it
+is complete, so a draft is never analyzed, exported or written, and the
+advanced editor still applies only valid documents.
+
+Double-click or F2 edits a system name, operation ID or edge latency target in
+place, with the same validation as the inspector. Systems and operations carry
+visible + buttons, and systems, operations and edges carry × buttons, with the
+blocking reason on a disabled + button. Right-clicking the canvas or any
+element opens a menu of its actions, blocked ones included with their reason.
+An MCP or A2A system that exposes its protocol also takes server details; the
+local workbench can list the server's tools or skills as described in the local
+MCP and A2A discovery proposal. Every graph action has a button or menu
+equivalent; the inspector's system selector moves an operation without
+dragging. The editor can fill the screen, using the Fullscreen API where it is
+permitted; Escape returns. The last 50 changes to the input can be undone and
+redone, and consecutive edits in one text field count as one change. Layout is
+computed from the input after every structural change, so dragged positions
+last until the next one; coordinates are never serialized.
+
+`DesignInput.systems` holds two to eight systems and `connections` one to
+twelve, so any caller operation may reach several downstream operations and any
+downstream operation may serve several callers. Each system still selects at
+most four operations, and each connection still selects a distinct operation
+pair between distinct systems. The relation engine, planner and
+cross-connection checks are unchanged and remain linear in the number of
+connections.
+
+### Open Workflow Specification interchange
+
+Plug exports and imports
+[Open Workflow Specification](https://open-workflow-specification.org/) 1.0.x
+documents as YAML or JSON. Export is deterministic:
+
+- `document` has `dsl: 1.0.3`, `namespace: plug`, a name derived from the
+  first caller system, version `0.1.0`, and `metadata.plug`, a
+  `WorkflowSpecMetadata` holding the canonical input and, when an analysis for
+  the same input hash is supplied, the input and design hashes and the selected
+  architecture per connection.
+- `do` lists one call task per connection, in connection order, named by the
+  connection ID. HTTP, MCP and A2A downstream interfaces map to `call: http`,
+  `call: mcp` (`tools/call`) and `call: a2a` (`message/send`). A declared
+  endpoint is copied; otherwise the endpoint is the placeholder URI
+  `plug://systems/<system>/operations/<operation>`. A known hard timeout
+  becomes the task `timeout`. Each task carries `metadata.plug`, a
+  `WorkflowTaskMetadata` with the connection's endpoints, priorities and
+  latency target.
+
+Import never fetches, resolves or calls anything. A document whose
+`metadata.plug` is valid is reconciled against its task list: connections keep
+their canonical facts, follow the task order, drop when their task is removed
+and take edited task priorities and latency targets. The result is `lossless`
+only when nothing was reconciled. Call tasks without Plug metadata are drafted:
+the workflow becomes the caller system, each endpoint host, MCP server or A2A
+agent becomes a downstream system (host names only), and each task becomes a
+connection. Every operational fact of a drafted connection is unknown; a task
+timeout is a declared hard bound; HTTP `GET` and `HEAD` are static read
+evidence. The placeholder experience, unmapped call types and unmodeled
+control flow (`switch`, `fork`, `for`, `try`, `listen`, `emit`, `run`,
+`set`, `wait`, `raise`) are listed as gaps. Documents beyond 256 KB, eight
+systems, twelve connections or four operations per system are rejected with
+counts.
+
+### Workspace spec bundle
+
+`plug spec [input] [--dir directory]` and the local-only workbench endpoint
+`POST /api/workspace/spec` validate and analyze an input or workflow document
+and write `<workspace>/.plug/`. Without an argument, `plug spec` re-applies
+`.plug/workflow.yaml`, so edits made to the spec of record are reconciled:
+
+- `workflow.yaml`, the exported workflow, which is the spec of record;
+- `design-input.json`, the canonical input;
+- `design.json`, the `DesignRecommendation`;
+- `design.md`, the explanation and implementation tasks;
+- `AGENTS.md`, a short guide telling coding agents what these files are, that
+  they are regenerated, and how to update them.
+
+Each file is written to a temporary sibling and renamed. Plug never edits the
+user's root `AGENTS.md` or other repository files. The workbench reads the bundle
+back through `GET /api/workspace/spec`, flags a `workflow.yaml` edited outside
+Plug and lets the author review it before replacing the graph. The hosted
+playground offers the same workflow as a download and never writes workspaces.
+
+### MCP server and IDE registration
+
+`plug mcp [--workspace dir]` serves Plug itself as a Model Context Protocol
+server over stdio for one workspace. It never listens on a port. Tools:
+
+- `plug_get_spec` returns the current bundle summary and workflow, or explains
+  how to generate it;
+- `plug_update_spec` accepts a `DesignInput` or a workflow document, validates
+  and reconciles it as above, re-analyzes and rewrites the bundle, and returns
+  the selected architectures and gaps;
+- `plug_analyze` validates and analyzes without writing;
+- `plug_index_workspace` runs the bounded workspace indexer and writes its
+  index;
+- `plug_explain` returns the explanation for the current bundle or one
+  connection.
+
+The bundle files are also resources under `plug://spec/`. Every call reads the
+workspace again, so the agent sees edits made in the workbench. Tool arguments
+are limited to 256 KB and indexing honors cancellation.
+
+`plug mcp install [--ide cursor|vscode|claude|generic] [--workspace dir]`
+registers the server in project-scoped configuration only: `.cursor/mcp.json`,
+`.vscode/mcp.json` or `.mcp.json`. It merges a `plug` entry, keeps every other
+entry, refuses to rewrite a file it cannot parse, and `generic` prints the
+entry instead of writing. User-level IDE configuration is never touched.
+
+## Rationale
+
+A graph is the natural representation of an n:n integration and makes the
+per-connection experience visible where it applies. The Open Workflow
+Specification is vendor-neutral and has native HTTP, MCP and A2A call tasks,
+matching Plug's three protocols. Embedding the canonical input keeps facts and
+evidence that a workflow document cannot express, while reconciliation keeps
+edits made in other workflow tools. Files under `.plug/` work with any agent
+that reads the repository; the MCP server adds a write path that goes through
+the same validation instead of letting agents hand-edit JSON. Stdio keeps the
+server private to the IDE process that started it.
+
+## Compatibility
+
+The format version stays `0.2-alpha.1`. Every valid document remains valid; only
+the upper bounds grow, so older readers may reject inputs with more than four
+systems or three connections. `WorkflowSpecMetadata` and `WorkflowTaskMetadata`
+are new public contracts. Hashes of existing inputs do not change. The
+workbench replaces the system cards and the per-connection experience form with
+the graph and its inspector; connection tabs, the advanced JSON editor and
+metadata import remain.
+
+## Alternatives
+
+- OpenSpec-style Markdown specs: readable by agents but not a workflow graph;
+  the `.plug/AGENTS.md` and `design.md` files cover the prose need.
+- BPMN or Serverless Workflow 0.8: heavier, and without MCP or A2A tasks.
+- Persisting graph coordinates: rejected so the serialized input stays
+  layout-free and hashes stay stable.
+- An HTTP MCP transport from `plug ui`: deferred; a listening endpoint needs
+  authentication that stdio does not.
+- Writing user-level IDE configuration or root `AGENTS.md`: rejected; Plug
+  only writes files it owns or explicitly registers into.
+
+## Security implications
+
+Workflow import is parse-only: no endpoint, Agent Card, MCP server or command in
+the document is fetched or run, and drafted systems keep host names or command
+base names only. Imports reuse the 256 KB, nesting, alias, tag and prototype
+guards. The bundle writer only writes inside `<workspace>/.plug/`. The MCP
+server uses stdio, accepts bounded arguments, never invokes described endpoints
+and validates every update like any other input. `plug mcp install` writes
+only project-scoped configuration and never overwrites unparseable files.
+
+## Implementation
+
+- Contracts: `schema/draft/schema.ts` (bounds, `WorkflowSpecMetadata`,
+  `WorkflowTaskMetadata`); `packages/plug/src/contracts/index.ts`.
+- Interchange: `packages/plug/src/openspec/index.ts`; bundle writer
+  `packages/plug/src/openspec/bundle.ts`.
+- MCP server and installer: `packages/plug/src/mcp/server.ts`; CLI `plug spec`,
+  `plug mcp`, `plug mcp install`.
+- Workbench endpoint: `packages/plug/src/ui/server.ts`.
+- Graph editor: `apps/playground/src/workflow/`, with `@xyflow/react` and
+  `elkjs`, loaded lazily.
+
+Remaining work before finalization: owner review, trials with workflow
+documents produced by other editors, and an authenticated network transport if
+remote IDEs need it.
+
+## Validation
+
+See [interchange tests](https://github.com/plugproject/plug/blob/main/tests/openspec.test.ts),
+[MCP server tests](https://github.com/plugproject/plug/blob/main/tests/mcp-server.test.ts),
+[local workbench tests](https://github.com/plugproject/plug/blob/main/tests/ui-server.test.ts),
+[contract tests](https://github.com/plugproject/plug/blob/main/tests/contracts-importers.test.ts),
+[workflow model tests](https://github.com/plugproject/plug/blob/main/tests/workflow-model.test.ts) and
+[API tests](https://github.com/plugproject/plug/blob/main/tests/api.test.ts). The [browser suite](https://github.com/plugproject/plug/blob/main/tests/browser/playground.spec.ts)
+covers dragging a connector onto an operation, the click-to-connect mode,
+fan-out from the connector menus, moving operations between systems and into
+new ones, refused moves, removing every kind of element with its connections,
+drafts and their gaps, creation by double-click and context menu, fullscreen
+editing, undo and redo, keyboard deletion, workflow download and upload
+review, and writing and reopening the workspace bundle.
+This proposal remains draft pending owner review.

@@ -1,7 +1,7 @@
 {
   "name": "plug-workspace",
   "private": true,
-  "version": "0.1.0-alpha.2",
+  "version": "0.2.0-alpha.1",
   "type": "module",
   "license": "UNLICENSED",
   "engines": {
@@ -21,7 +21,7 @@
     "check": "tsc --noEmit && eslint . && npm run check:format && npm run check:generated && tsx scripts/validate-examples.ts && npm run check:docs && vitest run",
     "test": "vitest run",
     "test:browser": "playwright test",
-    "build": "npm run generate && tsx scripts/build.ts && vite build --config apps/playground/vite.config.ts",
+    "build": "npm run generate && vite build --config apps/playground/vite.config.ts && tsx scripts/build.ts",
     "start": "NODE_ENV=production node dist/server.js",
     "example:flight": "tsx examples/flight-search/run.ts",
     "example:http": "tsx examples/your-http-api/run.ts",
@@ -31,7 +31,9 @@
     "test:package": "tsx scripts/test-package.ts"
   },
   "dependencies": {
+    "@xyflow/react": "12.12.0",
     "ajv": "8.20.0",
+    "elkjs": "0.12.0",
     "express": "5.2.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",

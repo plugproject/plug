@@ -9,7 +9,7 @@ import {
 const input = validateInput(
   JSON.parse(readFileSync(new URL('./input.json', import.meta.url), 'utf8')),
 );
-const report = suggestDesign(input),
+const report = suggestDesign(input).connections[0],
   candidate = report.candidates.find((c) => c.id === report.selectedId);
 if (!candidate) throw new Error('No feasible local design');
 const server = createServer((req, res) => {
@@ -41,7 +41,7 @@ const runner = runDemo(candidate, {
   onEvent: (e) => console.log(JSON.stringify(e)),
 });
 const requests = setInterval(() => {
-  void runner?.request(input.workload.prewarmKeys![0]);
+  void runner?.request(input.connections[0].workload.prewarmKeys![0]);
 }, 2000);
 function stop() {
   clearInterval(requests);

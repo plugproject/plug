@@ -5,6 +5,8 @@ import { join, resolve } from 'node:path';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import assert from 'node:assert/strict';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 const dir = mkdtempSync(join(tmpdir(), 'plug-packed-'));
 const packed = JSON.parse(
   execFileSync(
@@ -53,14 +55,16 @@ for (const s of input.systems) {
     additionalProperties: false,
   };
 }
-input.connection.inputMapping = [
+const connection = input.connections[0];
+connection.inputMapping = [
   { from: 'sku', to: 'sku' },
   { from: 'region', to: 'region' },
 ];
-input.connection.outputMapping = [{ from: 'available', to: 'available' }];
-input.profile.latencyMs.value = 350;
-input.workload.prewarmKeys = [{ sku: 'PACKED-2', region: 'north' }];
-for (const row of input.workload.trace) row.key = input.workload.prewarmKeys[0];
+connection.outputMapping = [{ from: 'available', to: 'available' }];
+connection.profile.latencyMs.value = 350;
+connection.workload.prewarmKeys = [{ sku: 'PACKED-2', region: 'north' }];
+for (const row of connection.workload.trace)
+  row.key = connection.workload.prewarmKeys[0];
 writeFileSync(join(dir, 'input.json'), JSON.stringify(input));
 const bin = join(dir, 'node_modules/@plugproject/plug/dist/cli.js');
 const report = JSON.parse(
@@ -70,7 +74,99 @@ const report = JSON.parse(
     { cwd: dir, encoding: 'utf8' },
   ),
 );
-assert.equal(report.selectedId, 'scheduled-cache');
+assert.equal(report.connections[0].selectedId, 'scheduled-cache');
+assert.equal(report.connections[0].selectedArchitectureId, 'scheduled-cache');
+const workspaceIndex = JSON.parse(
+  execFileSync(process.execPath, [bin, 'index', '.'], {
+    cwd: dir,
+    encoding: 'utf8',
+  }),
+);
+assert.equal(workspaceIndex.indexerVersion, 'indexer-1');
+assert.ok(
+  !JSON.stringify(workspaceIndex).includes('node_modules'),
+  'indexer skips dependencies',
+);
+execFileSync(process.execPath, [bin, 'spec', 'input.json'], {
+  cwd: dir,
+  encoding: 'utf8',
+});
+const workflow = readFileSync(join(dir, '.plug/workflow.yaml'), 'utf8');
+assert.ok(workflow.includes('dsl: 1.0.3'), 'plug spec writes the workflow');
+assert.ok(
+  readFileSync(join(dir, '.plug/AGENTS.md'), 'utf8').includes(
+    'plug_update_spec',
+  ),
+);
+execFileSync(process.execPath, [bin, 'mcp', 'install', '--ide', 'cursor'], {
+  cwd: dir,
+  encoding: 'utf8',
+});
+const cursorConfig = JSON.parse(
+  readFileSync(join(dir, '.cursor/mcp.json'), 'utf8'),
+);
+assert.deepEqual(cursorConfig.mcpServers.plug.args.slice(0, 3), [
+  '--no-install',
+  'plug',
+  'mcp',
+]);
+const mcp = new Client({ name: 'plug-package-test', version: '0.0.0' });
+await mcp.connect(
+  new StdioClientTransport({
+    command: process.execPath,
+    args: [bin, 'mcp', '--workspace', dir],
+    cwd: dir,
+    stderr: 'pipe',
+  }),
+);
+try {
+  const tools = (await mcp.listTools()).tools.map((t) => t.name).sort();
+  assert.deepEqual(tools, [
+    'plug_analyze',
+    'plug_explain',
+    'plug_get_spec',
+    'plug_index_workspace',
+    'plug_update_spec',
+  ]);
+  const spec = await mcp.callTool({ name: 'plug_get_spec', arguments: {} });
+  assert.ok(!spec.isError, 'packed MCP server reads the spec');
+} finally {
+  await mcp.close();
+}
+await new Promise<void>((resolveUi, reject) => {
+  const child = spawn(process.execPath, [bin, 'ui', '--port', '0'], {
+    cwd: dir,
+  });
+  let output = '';
+  const timer = setTimeout(() => {
+    child.kill('SIGTERM');
+    reject(new Error('Packed workbench timeout ' + output));
+  }, 10000);
+  child.stderr.on('data', (c) => (output += c.toString()));
+  child.stdout.on('data', async (chunk) => {
+    output += chunk.toString();
+    const url = /http:\/\/127\.0\.0\.1:\d+/.exec(output)?.[0];
+    if (!url) return;
+    try {
+      const page = await fetch(url);
+      assert.equal(page.status, 200);
+      assert.ok((await page.text()).includes('<div id="root">'));
+      const workspace = await fetch(`${url}/api/workspace`);
+      assert.equal((await workspace.json()).indexed, false);
+      const indexed = await fetch(`${url}/api/workspace/index`, {
+        method: 'POST',
+      });
+      assert.equal((await indexed.json()).fresh, true);
+      clearTimeout(timer);
+      child.kill('SIGTERM');
+      resolveUi();
+    } catch (e) {
+      clearTimeout(timer);
+      child.kill('SIGTERM');
+      reject(e);
+    }
+  });
+});
 assert.ok(
   readFileSync(
     join(dir, 'node_modules/@plugproject/plug/dist/schema.json'),

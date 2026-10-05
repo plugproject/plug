@@ -294,17 +294,6 @@ h2 {
   border-radius: 4px;
   padding: 6px 9px;
 }
-.system-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-.system-card {
-  background: #f7f9f1;
-  border: 1px solid #dde3d4;
-  border-radius: 8px;
-  padding: 22px;
-}
 .card-label {
   font-size: 9px;
   color: #748264;
@@ -321,9 +310,6 @@ h2 {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
-}
-.system-card .fields {
-  grid-template-columns: 1fr 1fr;
 }
 .profile-fields {
   margin-top: 24px;
@@ -738,7 +724,6 @@ details li {
   .hero-visual {
     padding: 24px;
   }
-  .system-grid,
   .design-grid {
     grid-template-columns: 1fr;
   }
@@ -750,9 +735,6 @@ details li {
   }
   .fields label {
     min-width: 0;
-  }
-  .system-card .fields {
-    grid-template-columns: 1fr 1fr;
   }
   .section-heading {
     gap: 10px;
@@ -823,4 +805,891 @@ details li {
   font-size: 9px;
   color: #7c886e;
   margin: 4px 0 0;
+}
+.connection-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin: 22px 0 18px;
+}
+.connection-tabs .candidate {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.connection-fields {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.priorities h3,
+.frontier h3,
+.cross-connection h3,
+#designs > h3 {
+  font-size: 14px;
+  font-weight: 500;
+  margin: 22px 0 6px;
+}
+.priorities ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  padding: 0;
+  margin: 8px 0 0;
+  list-style: none;
+  counter-reset: priority;
+}
+.priorities li {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid #dce2d3;
+  background: #f7f9f2;
+  border-radius: 6px;
+  padding: 2px 4px 2px 10px;
+  font-size: 12px;
+  counter-increment: priority;
+}
+.priorities li::before {
+  content: counter(priority) '.';
+  color: #8c967e;
+  margin-right: 4px;
+}
+.priorities .text-button {
+  padding: 6px 8px;
+}
+.frontier ol {
+  padding: 0;
+  list-style: none;
+}
+.architecture-row {
+  border: 1px solid #dce2d3;
+  background: #f7f9f2;
+  border-radius: 8px;
+  padding: 12px 15px;
+  margin: 8px 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.architecture-row.selected {
+  background: #e9efda;
+  border-color: #a2b578;
+  box-shadow: inset 3px 0 #89a254;
+}
+.architecture-row > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.architecture-row small {
+  color: #7c886e;
+}
+.architecture-row details {
+  margin-top: 10px;
+  padding-top: 8px;
+}
+.architecture-row h4 {
+  font-size: 11px;
+  font-weight: 600;
+  margin: 10px 0 2px;
+}
+.relation-facts {
+  padding-left: 16px;
+  overflow-wrap: anywhere;
+}
+.finding-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+.finding-counts li {
+  background: #eff3e7;
+  border-radius: 4px;
+  padding: 6px 10px;
+}
+.workspace-panel .empty-state button {
+  margin-top: 16px;
+}
+@media (max-width: 950px) {
+  .connection-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.workflow-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.toolbar-spacer {
+  flex: 1;
+}
+.file-button {
+  position: relative;
+  overflow: hidden;
+}
+.file-button input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.file-button:focus-within {
+  outline: 2px solid #89a254;
+  outline-offset: 2px;
+}
+.workflow-toolbar + .notice,
+.spec-review {
+  margin-top: 16px;
+}
+.spec-review p,
+.spec-review li {
+  font-size: 12px;
+}
+.spec-review button + button {
+  margin-left: 10px;
+}
+.workflow-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(270px, 34%, 360px);
+  gap: 16px;
+  align-items: start;
+}
+.wf-stage {
+  position: relative;
+  min-width: 0;
+}
+.wf-inspect-chip {
+  display: none;
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  z-index: 6;
+  max-width: calc(100% - 24px);
+  padding: 8px 14px;
+  background: #263e2b;
+  color: #f8ffe9;
+  border-color: #263e2b;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.wf-inline {
+  display: grid;
+  gap: 2px;
+  padding: 6px 8px;
+}
+.wf-inline input {
+  margin: 0;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+.wf-inline input[aria-invalid='true'] {
+  border-color: #c9765a;
+}
+.wf-inline small {
+  color: #9c4730;
+  font-size: 10px;
+  line-height: 1.3;
+  white-space: normal;
+}
+.wf-edge-label .wf-inline {
+  padding: 2px 0 0;
+  width: 100%;
+}
+.react-flow__node-system {
+  pointer-events: none;
+}
+.react-flow__node-system .wf-system-title,
+.react-flow__node-system .wf-inline,
+.react-flow__node-system .wf-node-actions {
+  pointer-events: all;
+}
+.wf-node-actions {
+  display: flex;
+  gap: 3px;
+}
+.wf-node-actions button {
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid #cfd5c7;
+  border-radius: 4px;
+  background: #fff;
+  color: #58733c;
+  font-size: 12px;
+  line-height: 1;
+}
+.wf-node-actions button:hover:not(:disabled) {
+  border-color: #89a254;
+  background: #eef3e2;
+}
+.wf-node-actions button:disabled {
+  opacity: 0.35;
+}
+.react-flow__edgeupdater {
+  cursor: move;
+}
+.react-flow__edge:hover .react-flow__edgeupdater {
+  fill: rgba(88, 115, 60, 0.25);
+}
+.wf-canvas {
+  position: relative;
+  height: 560px;
+  min-width: 0;
+  border: 1px solid #dde3d4;
+  border-radius: 8px;
+  background: #f7f9f1;
+  overflow: hidden;
+}
+.wf-canvas:focus-visible {
+  outline: 2px solid #89a254;
+}
+.wf-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #7c886e;
+  font-size: 12px;
+  margin: 0;
+}
+.wf-canvas > .wf-loading {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.wf-canvas-tools {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 5;
+  display: flex;
+  gap: 6px;
+}
+.wf-canvas-tools button {
+  background: #fff;
+  border: 1px solid #dde3d4;
+  padding: 6px 10px;
+}
+.icon-button {
+  padding: 9px 13px;
+  font-size: 16px;
+  line-height: 1;
+}
+.wf-system {
+  width: 100%;
+  height: 100%;
+  border: 1px dashed #b9c6a6;
+  border-radius: 10px;
+  background: rgba(239, 243, 231, 0.6);
+}
+.wf-system.focused {
+  border: 1.5px solid #89a254;
+}
+.wf-system-head {
+  display: flex;
+  align-items: flex-start;
+}
+.wf-system-head .wf-system-title,
+.wf-system-head .wf-inline {
+  flex: 1;
+  min-width: 0;
+}
+.wf-system-head .wf-node-actions {
+  padding: 11px 10px 0 0;
+}
+.wf-system-title {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: none;
+  padding: 12px 14px;
+  font-size: 12px;
+  letter-spacing: 0.4px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.wf-system-title small {
+  color: #7c886e;
+  font-weight: 400;
+  margin-left: 6px;
+}
+.wf-operation {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border: 1px solid #cfd5c7;
+  border-radius: 7px;
+  background: #fff;
+}
+.wf-operation .wf-node-actions,
+.wf-edge-label .wf-node-actions {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+.wf-operation.focused {
+  border-color: #89a254;
+  box-shadow: 0 0 0 2px #dfe8cb;
+}
+.wf-operation > button {
+  display: block;
+  width: 100%;
+  height: 100%;
+  text-align: left;
+  border: 0;
+  background: none;
+  padding: 9px 30px 9px 12px;
+  font-size: 12px;
+  overflow: hidden;
+}
+.wf-operation > button small {
+  display: block;
+  color: #7c886e;
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wf-operation .wf-port {
+  width: 10px;
+  height: 10px;
+  background: #58733c;
+  border: 2px solid #fff;
+}
+/* Beyond the ring that rewires an edge end, which React Flow centres 14px out. */
+.wf-operation .wf-plus {
+  width: 22px;
+  height: 22px;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid #89a254;
+  border-radius: 50%;
+  background: #fff;
+  color: #58733c;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1;
+  opacity: 0;
+  /* Stays visible briefly so the pointer can travel from the card to it. */
+  transition:
+    opacity 120ms ease 400ms,
+    background-color 120ms ease;
+}
+.wf-operation .wf-plus.react-flow__handle-right {
+  right: -35px;
+}
+.wf-operation .wf-plus.react-flow__handle-left {
+  left: -35px;
+}
+.wf-operation .wf-plus::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 19px;
+  border-top: 1.5px dashed #b9c6a6;
+  pointer-events: none;
+}
+.wf-operation .wf-plus.react-flow__handle-right::before {
+  right: 100%;
+}
+.wf-operation .wf-plus.react-flow__handle-left::before {
+  left: 100%;
+}
+.wf-operation .wf-plus span {
+  pointer-events: none;
+}
+.react-flow__node-operation:hover .wf-plus,
+.react-flow__node-operation:focus-within .wf-plus,
+.wf-linking .wf-operation .wf-plus {
+  opacity: 1;
+  transition-delay: 0ms;
+}
+.wf-operation .wf-plus:hover,
+.wf-operation .wf-plus:focus-visible,
+.wf-operation .wf-plus.connectingfrom {
+  background: #58733c;
+  color: #fff;
+}
+.wf-operation .wf-plus:focus-visible {
+  outline: 3px solid #88a649;
+  outline-offset: 2px;
+}
+@media (hover: none) {
+  .wf-operation .wf-plus {
+    opacity: 1;
+  }
+}
+/* Drop targets covering the card; React Flow enables them only while a connection is drawn. */
+.wf-operation .wf-drop {
+  inset: 0;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  transform: none;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+}
+.wf-operation .wf-drop.connectingto {
+  outline: 2px solid #58733c;
+  background: rgba(137, 162, 84, 0.12);
+}
+.wf-operation .wf-drop.connectingto:not(.valid) {
+  outline: 2px dashed #c9765a;
+  background: rgba(201, 118, 90, 0.1);
+}
+.wf-operation.mark-pick {
+  border-style: dashed;
+  border-color: #89a254;
+}
+.wf-operation.mark-origin {
+  border-color: #58733c;
+  box-shadow: 0 0 0 3px #c9da9f;
+}
+.wf-operation.mark-valid {
+  border-color: #58733c;
+  box-shadow: 0 0 0 2px #dfe8cb;
+}
+.wf-operation.mark-invalid {
+  opacity: 0.5;
+}
+.wf-linking .wf-operation > button {
+  cursor: crosshair;
+}
+.wf-link-preview {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.wf-link-preview path {
+  fill: none;
+  stroke: #58733c;
+  stroke-width: 2;
+  stroke-dasharray: 6 5;
+}
+.wf-system-empty {
+  margin: 0;
+  padding: 10px 18px;
+  color: #7c886e;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.wf-canvas > .wf-empty {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  color: #7c886e;
+  font-size: 13px;
+  pointer-events: none;
+}
+.mode-button[aria-pressed='true'] {
+  background: #263e2b;
+  color: #f8ffe9;
+  border-color: #263e2b;
+}
+.draft-gaps ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+.draft-gaps li {
+  margin: 2px 0;
+}
+.discovery {
+  margin-top: 18px;
+  border-top: 1px solid #dde3d4;
+}
+.discovery h3 {
+  margin-top: 14px;
+}
+.discovery textarea {
+  min-height: 52px;
+}
+.discovery-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0;
+}
+.discovery-actions button {
+  padding: 8px 14px;
+}
+.discovery-problem {
+  color: #9c4730;
+}
+.discovery-list {
+  margin: 12px 0 0;
+  padding: 8px 10px 10px;
+  border: 1px solid #dde3d4;
+  border-radius: 8px;
+  background: #fff;
+  min-width: 0;
+}
+.discovery-list legend {
+  padding: 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.discovery-list input[type='search'] {
+  margin: 4px 0 8px;
+  padding: 7px 10px;
+}
+.discovery-list ul {
+  display: grid;
+  gap: 2px;
+  max-height: 300px;
+  margin: 4px 0 8px;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.discovery-list li label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  padding: 6px;
+  border-radius: 6px;
+  color: #263426;
+  font-size: 12px;
+  cursor: pointer;
+}
+.discovery-list li label:hover {
+  background: #f4f7ec;
+}
+.discovery-list li label.unusable {
+  color: #8d978a;
+  cursor: not-allowed;
+}
+.discovery-list li input {
+  width: auto;
+  margin: 2px 0 0;
+  accent-color: #58733c;
+}
+.discovery-list li span {
+  display: grid;
+  min-width: 0;
+}
+.discovery-list li strong {
+  overflow-wrap: anywhere;
+}
+.discovery-list li small {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #7c886e;
+  font-size: 11px;
+  font-weight: 400;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.wf-edge .react-flow__edge-path {
+  stroke: #9aa98a;
+  stroke-width: 1.5;
+}
+.wf-edge.focused .react-flow__edge-path {
+  stroke: #58733c;
+  stroke-width: 2.5;
+}
+.wf-edge-label {
+  position: absolute;
+  pointer-events: all;
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  width: 200px;
+  min-height: 60px;
+  padding: 6px 9px;
+  border-radius: 6px;
+  border: 1px solid #d7deca;
+  background: #fcfdf9;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: left;
+}
+.wf-edge-label strong,
+.wf-edge-label span {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.wf-edge-label strong {
+  font-size: 11px;
+}
+.wf-edge-label small {
+  color: #7c886e;
+  overflow-wrap: anywhere;
+}
+.wf-edge-label.focused {
+  border-color: #89a254;
+  background: #e9efda;
+}
+.wf-edge-main {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  width: 100%;
+  padding: 0 40px 0 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.wf-edge-label.infeasible {
+  border-color: #e0b6a4;
+}
+.inspector {
+  border: 1px solid #dde3d4;
+  border-radius: 8px;
+  background: #f7f9f1;
+  padding: 16px;
+  min-width: 0;
+  max-height: 560px;
+  overflow-y: auto;
+  scroll-margin-top: 16px;
+}
+.inspector h3 {
+  font-size: 14px;
+  font-weight: 500;
+  margin: 20px 0 6px;
+}
+.inspector-heading h3 {
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+}
+.inspector-heading .tag {
+  margin-left: 0;
+  display: inline-block;
+}
+.inspector-heading p {
+  margin: 2px 0 10px;
+}
+.inspector .fields,
+.inspector .connection-fields {
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0 12px;
+}
+.inspector .profile-fields {
+  margin-top: 0;
+}
+.inspector > button {
+  margin-top: 14px;
+  margin-right: 10px;
+}
+.link-list {
+  padding-left: 16px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.link-list .text-button {
+  padding: 2px 4px;
+}
+.wf-canvas {
+  --xy-edge-stroke-selected: #58733c;
+}
+.react-flow__node:focus-visible .wf-system,
+.react-flow__node:focus-visible .wf-operation {
+  outline: 3px solid #88a649;
+  outline-offset: 2px;
+}
+.react-flow__edge:focus-visible .react-flow__edge-path {
+  stroke-width: 3.5;
+}
+.wf-system.drop-accept {
+  border: 2px solid #58733c;
+  background: rgba(214, 228, 186, 0.75);
+}
+.wf-system.drop-reject {
+  border: 2px dashed #c9765a;
+  background: rgba(251, 229, 220, 0.65);
+}
+.wf-hint {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 7;
+  max-width: calc(100% - 270px);
+  margin: 0;
+  padding: 7px 12px;
+  border-radius: 6px;
+  background: #263e2b;
+  color: #f8ffe9;
+  font-size: 12px;
+  line-height: 1.4;
+  pointer-events: none;
+}
+.wf-hint.blocked {
+  border: 1px solid #e0b6a4;
+  background: #fbe5dc;
+  color: #9c4730;
+}
+.wf-menu {
+  position: absolute;
+  z-index: 20;
+  display: grid;
+  gap: 1px;
+  width: max-content;
+  min-width: 200px;
+  max-width: min(330px, calc(100% - 16px));
+  max-height: calc(100% - 16px);
+  overflow-y: auto;
+  padding: 5px;
+  border: 1px solid #cfd5c7;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(35, 51, 40, 0.16);
+}
+.wf-menu button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 10px;
+  justify-items: start;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+}
+.wf-menu button > span {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.wf-menu button:hover,
+.wf-menu button:focus-visible {
+  background: #eef3e2;
+}
+.wf-menu button:focus-visible {
+  outline: 2px solid #88a649;
+  outline-offset: -2px;
+}
+.wf-menu button[aria-disabled='true'] {
+  color: #8d978a;
+  cursor: not-allowed;
+}
+.wf-menu button[aria-disabled='true']:hover {
+  background: none;
+}
+.wf-menu button small {
+  grid-column: 1 / -1;
+  color: #9c4730;
+  font-size: 10px;
+  font-weight: 400;
+  white-space: normal;
+}
+.wf-menu-heading {
+  padding: 6px 10px 2px;
+  color: #7c886e;
+  font-size: 10px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+html.wf-locked {
+  overflow: hidden;
+}
+.workflow-editor.wf-full {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px 16px;
+  background: #f4f5ef;
+  overflow: hidden;
+}
+.wf-full > * {
+  margin: 0;
+}
+.wf-full > .workflow-toolbar {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  margin: -6px;
+  padding: 6px;
+}
+.wf-full > .workflow-toolbar > :not(.toolbar-spacer) {
+  flex: none;
+}
+.wf-full > .spec-review {
+  max-height: 30vh;
+  overflow-y: auto;
+}
+.wf-full > .connection-tabs {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+.wf-full .connection-tabs .candidate {
+  flex: none;
+  padding: 8px 12px;
+  gap: 2px;
+}
+.wf-full .workflow-layout {
+  flex: 1;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr) clamp(280px, 30%, 380px);
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+}
+.wf-full .wf-canvas {
+  height: 100%;
+}
+.wf-full .inspector {
+  max-height: none;
+}
+.wf-full .wf-inspect-chip {
+  display: none;
+}
+@media (max-width: 800px) {
+  .workflow-layout {
+    grid-template-columns: 1fr;
+  }
+  .inspector {
+    max-height: none;
+  }
+  .wf-inspect-chip {
+    display: inline-flex;
+  }
+  .wf-full .workflow-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) minmax(0, 42%);
+  }
+}
+@media (max-width: 650px) {
+  .wf-canvas {
+    height: 420px;
+  }
+  .wf-hint {
+    top: 50px;
+    max-width: calc(100% - 20px);
+  }
+  .toolbar-spacer {
+    display: none;
+  }
 }

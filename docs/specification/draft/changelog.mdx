@@ -2,6 +2,29 @@
 title: Changelog
 ---
 
+## 0.2-alpha.1 draft
+
+Two to eight systems and one to twelve connections (n:n), each with its own profile,
+workload and experience. Optional goal fields and lexicographic priorities. A
+three-valued relation engine, a pattern knowledge base, a bounded composition
+planner and a Pareto frontier with proofs per connection. Cross-connection quota
+checks. `WorkspaceIndex` from a bounded local scan and the local workbench.
+`0.1-alpha.2` documents migrate mechanically. See
+[SEP-0000](/seps/0000-local-workbench-and-multi-system).
+
+Open Workflow Specification 1.0.x export and import with the new
+`WorkflowSpecMetadata` and `WorkflowTaskMetadata` contracts, the `.plug/` workspace
+spec bundle and a stdio MCP server for coding agents. The format version is
+unchanged; only the system and connection upper bounds grew. See
+[workflow interchange](/specification/draft/interchange) and
+[SEP-0000](/seps/0000-workflow-graph-and-openspec).
+
+The local workbench lists an MCP server's tools or an A2A agent's skills from a URL
+and transient headers, never calling a tool or sending a message, and imports the
+chosen ones through the metadata importers; the hosted playground never contacts a
+server. No contract changes. See [architecture](/specification/draft/architecture)
+and [SEP-0000](/seps/0000-local-mcp-a2a-discovery).
+
 ## 0.1-alpha.2 draft
 
 Introduce two-system architecture recommendations, operational/data/workload evidence,

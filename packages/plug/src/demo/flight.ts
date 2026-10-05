@@ -1,4 +1,5 @@
 import type {
+  Connection,
   DesignInput,
   Evidence,
   Fact,
@@ -107,12 +108,13 @@ export const outputSchema = {
 };
 function buildFlightInput(): DesignInput {
   return {
-    formatVersion: '0.1-alpha.2',
+    formatVersion: '0.2-alpha.1',
     systems: [
       {
         id: 'agent',
         name: 'Flight-search agent',
         role: 'caller',
+        trustDomain: 'plug-fixture',
         interfaces: [
           {
             id: 'http-client',
@@ -137,6 +139,13 @@ function buildFlightInput(): DesignInput {
         id: 'aggregator',
         name: 'Slow flight aggregator',
         role: 'downstream',
+        trustDomain: 'plug-fixture',
+        messaging: {
+          delivery: 'none',
+          ordering: 'none',
+          durable: null,
+          dlq: null,
+        },
         interfaces: [
           {
             id: 'http-server',
@@ -154,19 +163,39 @@ function buildFlightInput(): DesignInput {
             inputSchema,
             outputSchema,
             semantics,
+            interaction: {
+              callback: false,
+              polling: false,
+              streaming: 'none',
+              cancellation: true,
+            },
           },
         ],
       },
     ],
-    connection: {
-      callerSystemId: 'agent',
-      callerOperationId: 'find-options',
-      downstreamSystemId: 'aggregator',
-      downstreamOperationId: 'search',
-      inputMapping: dimensions.map((d) => ({ from: d, to: d })),
-      outputMapping: [{ from: 'offers', to: 'offers' }],
-      adapter: null,
+    connections: [buildConnection()],
+    infrastructure: {
+      cacheAllowed: true,
+      schedulingAllowed: true,
+      cacheCapacity: 2,
+      memoryBytes: 1048576,
+      refreshConcurrency: 2,
+      schedulingAllowanceMs: fact(5000),
+      foregroundReserveCallsPerMinute: 2,
+      callBudgetPerMinute: null,
     },
+  };
+}
+function buildConnection(): Connection {
+  return {
+    id: 'primary',
+    callerSystemId: 'agent',
+    callerOperationId: 'find-options',
+    downstreamSystemId: 'aggregator',
+    downstreamOperationId: 'search',
+    inputMapping: dimensions.map((d) => ({ from: d, to: d })),
+    outputMapping: [{ from: 'offers', to: 'offers' }],
+    adapter: null,
     profile: {
       systemId: 'aggregator',
       operationId: 'search',
@@ -184,6 +213,7 @@ function buildFlightInput(): DesignInput {
     },
     workload: {
       requestsPerMinute: fact(50),
+      burstPerMinute: fact(60),
       hotKeyShare: { value: 0.98, evidence: synthetic },
       prewarmKeys: keys,
       keyCount: fact(2),
@@ -208,16 +238,13 @@ function buildFlightInput(): DesignInput {
       hitsWithinTarget: { value: 0.99, evidence: synthetic },
       hitsWithinTargetMs: 2000,
       initialOutput: null,
-    },
-    infrastructure: {
-      cacheAllowed: true,
-      schedulingAllowed: true,
-      cacheCapacity: 2,
-      memoryBytes: 1048576,
-      refreshConcurrency: 2,
-      schedulingAllowanceMs: fact(5000),
-      foregroundReserveCallsPerMinute: 2,
-      callBudgetPerMinute: null,
+      priorities: [
+        'correctness',
+        'cost',
+        'latency',
+        'availability',
+        'simplicity',
+      ],
     },
     remainingPath: {
       agentMs: fact(500),
@@ -227,7 +254,6 @@ function buildFlightInput(): DesignInput {
       cacheLookupMs: fact(200),
       deliveryAllowanceMs: fact(1000),
     },
-    preference: 'cost',
   };
 }
 

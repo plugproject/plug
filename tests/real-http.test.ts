@@ -10,7 +10,9 @@ import type { DemoEvent } from '../packages/plug/src/index';
 it('real 15-second HTTP source retains latency while eligible warm hits are fast', async () => {
   const fixture = await startFixture(),
     input = flightInput(),
-    c = suggestDesign(input).candidates.find((c) => c.id === 'cache-aside')!,
+    c = suggestDesign(input).connections[0].candidates.find(
+      (c) => c.id === 'cache-aside',
+    )!,
     events: DemoEvent[] = [];
   const runner = runDemo(c, {
     endpoint: fixture.endpoint,

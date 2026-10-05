@@ -5,21 +5,38 @@ title: Recommendations and execution
 Every criterion is pass_under_assumptions, fail or unknown with compared values and
 evidence. Any known hard violation yields infeasible. Missing essential semantics
 produce insufficient_information; operational/evidence prerequisites produce
-conditional. Feasible candidates rank first, then preference, component count and
-stable ID. Missing cost never equals zero and disables cost ranking.
+conditional. Missing cost never equals zero and disables cost ranking.
+
+A recommendation holds one report per connection. Each report keeps the six seed
+candidates and adds relation facts, pattern applicability and architectures. The
+planner closes every detected problem and introduced obligation from each viable
+seed with at most six added patterns and twelve stacks per seed, in a fixed order.
+An unresolved problem makes the architecture infeasible; an open obligation, an
+unknown pattern or an unknown problem makes it at most conditional.
+
+Within each status tier, an architecture is on the frontier unless another one is
+no worse on every trade-off dimension and better on one. A dimension known for one
+architecture and unknown for the other prevents domination. The frontier is ranked
+by status, then the connection's priorities, then stable ID. When the first two
+feasible frontier architectures tie on every priority, `policyDecisionNeeded` is
+set instead of picking silently. Every architecture carries a proof: because,
+rejected alternatives and unknowns. With two or more connections, cross-connection
+checks test the shared call budget and each downstream quota shared by connections.
 
 Outputs include direct/proposed diagrams, introduced components, exact configuration,
 policy fingerprint, input/catalog/design hashes, estimates, assumptions, tradeoffs,
 prerequisites and ordered tasks. Reports separate metadata understood, design evaluated
-and executable here. No feasible candidate is a valid result within this catalog.
+and executable here. Only seed designs without added patterns are executable here.
+No feasible candidate is a valid result within this catalog.
 
 Demo sessions start empty, permit two cached entries, 1 MB, two simultaneous upstream
-calls, twenty actions and 120 seconds. Four sandboxes may run globally. Scheduled
-prewarming visibly performs real HTTP calls. Actions accept only fixed fixture keys
-and enums; the ephemeral token travels in a header. Results arrive on the existing
-NDJSON stream. Disconnect, cancellation, lifetime or shutdown has one terminal state,
-invalidates tokens and clears resources. Rate limits use bounded per-IP admission.
-Late responses are ignored and expired snapshots are not served.
+calls, twenty actions and 120 seconds. Four sandboxes may run in the hosted
+playground and one in the local workbench. Scheduled prewarming visibly performs
+real HTTP calls. Actions accept only fixed fixture keys and enums; the ephemeral
+token travels in a header. Results arrive on the existing NDJSON stream. Disconnect,
+cancellation, lifetime or shutdown has one terminal state, invalidates tokens and
+clears resources. Rate limits use bounded per-IP admission. Late responses are
+ignored and expired snapshots are not served.
 
 Local runtime accepts only explicitly trusted loopback HTTP with the fixed response
 envelope and tested JSON Schema dialects. Authenticated MCP/A2A execution is deferred.

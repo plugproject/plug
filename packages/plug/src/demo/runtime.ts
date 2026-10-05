@@ -112,7 +112,7 @@ export function runDemo(design: Candidate, options: DemoOptions) {
   ) {
     if (!ended)
       options.onEvent({
-        formatVersion: '0.1-alpha.2',
+        formatVersion: '0.2-alpha.1',
         type,
         atMs: Date.now(),
         message,
@@ -131,7 +131,7 @@ export function runDemo(design: Candidate, options: DemoOptions) {
     if (ended) return;
     ended = true;
     options.onEvent({
-      formatVersion: '0.1-alpha.2',
+      formatVersion: '0.2-alpha.1',
       type: 'sandbox-termination',
       atMs: Date.now(),
       message: reason,

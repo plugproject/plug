@@ -32,10 +32,96 @@ npm pack --workspace @plugproject/plug --pack-destination /tmp
 ```
 
 Install the resulting tarball in a fresh directory outside this workspace with
-`npm install /tmp/plugproject-plug-0.1.0-alpha.2.tgz`. Public distribution still awaits
-the owner's license choice. Copy `examples/your-http-api/input.json`, change both
-system descriptions, explicit mappings, input/output contract, profile and exact
-keys to match your service. The source must accept POST JSON and return
+`npm install /tmp/plugproject-plug-0.2.0-alpha.1.tgz`. Public distribution still awaits
+the owner's license choice.
+
+```sh
+npx plug ui
+```
+
+The local workbench serves the same UI on http://127.0.0.1:4319 (loopback only;
+`--port` and `--workspace` change the defaults). If the current project is not
+indexed it offers to index it; `npx plug index . --out index.json` does the same from
+the command line. Review the draft system and the listed gaps, then use it as the
+caller or downstream, or add MCP and A2A systems from their servers or imported
+metadata.
+
+## Edit the workflow graph
+
+The Workflow section draws each system as a group and its operations as nodes. Each
+edge is one connection; its badge shows the top priorities, latency target and, after
+analysis, the selected architecture. Select an edge, by its line or badge, to edit what
+that connection needs in the inspector beside the canvas: its required experience,
+priorities and downstream behavior. The badge's **✎** button jumps to them (on narrow
+screens the inspector sits below; **Edit … ↓** jumps to it).
+
+Create elements anywhere. Double-click empty canvas to add a system, or the inside of a
+system to add an operation to it. Right-click the canvas, a system, an operation or an
+edge for its actions. Hover an operation to show a **+** on each side. Drag the right
+one onto any part of an operation of another system to add a connection (the left one
+draws it from a caller), or drop the drag on empty canvas to create a new connected
+system. Click a **+** instead to pick from every operation it can still call or serve;
+pick as many as you need. **+ Add connection** connects by clicking: click the calling
+operation, then the operation it calls; Escape cancels. A design holds up to eight
+systems, four operations per system and twelve connections.
+
+Drag an operation onto another system to move it there, or onto empty canvas to give
+it a new system with the same interface. Its connections follow: as when rewiring, a
+moved caller loses its mappings and a moved downstream operation's facts become
+unknown. The hint while dragging says why a move is refused, for example when it would
+join a system to itself. **Move to…** in the operation's menu and the inspector's
+**System** selector do the same without dragging.
+
+**×** removes any system, operation or edge, as does Delete on the selected one; an
+operation or system takes its connections with it, the canvas says what went, and undo
+restores it. While the graph lacks two systems, an operation in every system or a
+connection, a notice lists what is missing and analysis and export wait until it is
+complete. Double-click, or press F2 on, a system name, operation ID or edge badge to
+rename it or set the latency target in place, and drag either end of an edge onto
+another operation to rewire it. **↶** and **↷**, or Ctrl/⌘+Z and Shift+Ctrl/⌘+Z, undo
+and redo the last 50 changes. **⤢ Fullscreen** gives the editor the whole screen;
+Escape returns. Suggest design and compare each connection's architecture frontier.
+
+For an MCP server or A2A agent, set the system's **Protocol** and keep **Direction** at
+**Exposes**; the inspector then takes the server's URL. In the local workbench, add any
+request headers the server needs (they are used for that request and never saved) and
+choose **Discover tools** or **Discover skills**. Plug lists the server's tools, or
+reads the agent's card, without calling anything; pick up to four as the system's
+operations and apply. The hosted playground never contacts your servers: paste a
+tools/list response or Agent Card under **Import MCP / A2A metadata** instead.
+
+**↓ Download OpenSpec** saves the graph as an
+[Open Workflow Specification](https://open-workflow-specification.org/) document,
+including the analysis when it is current. **↑ Upload OpenSpec** reads such a
+document back. A Plug export restores exactly; edited priorities, latency targets,
+task order and removed tasks are reconciled. Other workflows are drafted with every
+operational fact unknown, and the review lists what you still need to supply before
+you replace the graph.
+
+## Share the spec with your IDE agent
+
+In the local workbench, **Write spec to workspace** writes `.plug/`; from the command
+line run:
+
+```sh
+npx plug spec input.json        # or a workflow.yaml; no argument re-applies .plug/workflow.yaml
+npx plug mcp install --ide cursor
+```
+
+`.plug/workflow.yaml` is the spec of record, next to `design-input.json`,
+`design.json`, `design.md` and an `AGENTS.md` guide for coding agents. Reference
+`.plug/AGENTS.md` from your own agent instructions if you want agents to read it
+first. `plug mcp install` registers `plug mcp` in project-scoped configuration
+(`--ide cursor`, `vscode` or `claude`; `generic` prints the entry). The agent can then
+read the spec and apply changes through `plug_update_spec`, which validates and
+re-analyzes them. When the workflow file changes outside Plug, the workbench flags
+it and **Open workspace spec** reviews the edit on the graph.
+
+## Adapt your own HTTP API
+
+Copy `examples/your-http-api/input.json`, change both system descriptions and the
+connection's explicit mappings, input/output contract, profile and exact keys to
+match your service. Earlier `0.1-alpha.2` documents are migrated automatically. The source must accept POST JSON and return
 `{snapshotAt, version, data}`. Snapshot time is Unix epoch milliseconds; `data` must
 match the declared output schema. Local bindings use trusted loopback HTTP only.
 
@@ -45,6 +131,8 @@ npx plug explain input.json
 npx plug demo input.json --endpoint http://127.0.0.1:4010/inventory
 ```
 
-Analyze performs no calls. Demo executes only the explicitly bound local service.
+With several connections, pass `--connection ID` to choose the one whose runner
+configuration is exported or executed. Analyze performs no calls. Demo executes only
+the explicitly bound local service.
 Exports are `design.json`, `design.md` (with Mermaid), and `runner.json` containing
 input/catalog/design hashes. Do not change requirements just to obtain feasibility.

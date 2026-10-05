@@ -6,4 +6,5 @@ playwright-report/
 test-results/
 *.tgz
 .env*
+.plug/
 .DS_Store

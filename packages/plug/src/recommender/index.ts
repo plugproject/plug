@@ -1,26 +1,35 @@
-import {
-  selectedOperation,
-  validateInput,
-  compileOperationSchema,
-} from '../contracts/index';
+import { defaultPriorities, validateInput } from '../contracts/index';
 import type {
   Candidate,
+  Connection,
+  ConnectionReport,
   Criterion,
   DesignInput,
   DesignRecommendation,
   Evidence,
   Fact,
+  Priority,
+  RelationFacts,
   RunnerConfig,
 } from '../contracts/index';
 import {
   catalog,
-  catalogVersion,
+  catalogVersion as seedCatalogVersion,
   cached,
   scheduled,
   intervals,
 } from '../patterns/catalog';
+import {
+  knowledge,
+  knowledgeVersion,
+  obligations,
+  problems,
+} from '../patterns/knowledge';
 import { exactKey, hash, makeSchedule, replayCoverage } from './policy';
+import { deriveRelation, endpoints } from './relation';
+import { planArchitectures } from './planner';
 import { flightInput } from '../demo/flight';
+export const catalogVersion = `0.2-alpha.1/${seedCatalogVersion.split('/')[1]}+${knowledgeVersion}`;
 const unknown: Evidence = {
   kind: 'unknown',
   note: 'Not supplied; no guarantee inferred.',
@@ -29,83 +38,183 @@ const sum = (...values: (number | null)[]) =>
   values.some((v) => v === null)
     ? null
     : (values as number[]).reduce((a, b) => a + b, 0);
-function mappingKnown(input: DesignInput): boolean {
-  const c = input.connection,
-    caller = input.systems
-      .find((s) => s.id === c.callerSystemId)!
-      .operations.find((o) => o.id === c.callerOperationId)!,
-    down = selectedOperation(input);
-  if (
-    !caller.inputSchema ||
-    !caller.outputSchema ||
-    !down.inputSchema ||
-    !down.outputSchema
-  )
-    return false;
-  try {
-    for (const system of input.systems)
-      for (const operation of system.operations) {
-        const protocol = system.interfaces.find(
-          (i) => i.id === operation.interfaceId,
-        )!.protocol;
-        if (operation.inputSchema)
-          compileOperationSchema(operation.inputSchema, protocol);
-        if (operation.outputSchema)
-          compileOperationSchema(operation.outputSchema, protocol);
-      }
-  } catch {
-    return false;
-  }
-  const covers = (
-    source: Record<string, unknown>,
-    target: Record<string, unknown>,
-    m: { from: string; to: string }[],
-  ) => {
-    const sp = source.properties as Record<string, unknown> | undefined,
-      tp = target.properties as Record<string, unknown> | undefined;
-    if (!sp || !tp || !m.length) return false;
-    return (
-      m.every(
-        (x) =>
-          Object.hasOwn(sp, x.from) &&
-          Object.hasOwn(tp, x.to) &&
-          hash(sp[x.from]) === hash(tp[x.to]),
-      ) &&
-      ((target.required as string[]) ?? []).every((k) =>
-        m.some((x) => x.to === k),
-      )
-    );
-  };
-  return (
-    covers(caller.inputSchema, down.inputSchema, c.inputMapping) &&
-    covers(down.outputSchema, caller.outputSchema, c.outputMapping)
-  );
-}
+/** The first latency/cost/simplicity priority orders seed candidates within a status. */
+const seedPreference = (priorities: Priority[]) =>
+  (priorities.find((p) => ['latency', 'cost', 'simplicity'].includes(p)) ??
+    'latency') as 'latency' | 'cost' | 'simplicity';
 export function suggestDesign(raw: unknown): DesignRecommendation {
-  const input = validateInput(raw),
-    op = selectedOperation(input),
+  const input = validateInput(raw);
+  const bundled = hash(input) === hash(flightInput());
+  const connections = input.connections.map((c, i) =>
+    evaluateConnection(input, c, bundled && i === 0),
+  );
+  const crossConnection = crossConnectionCriteria(input, connections);
+  const prefix = input.connections.length > 1;
+  const result = {
+    formatVersion: input.formatVersion,
+    catalogVersion,
+    catalogHash: hash({
+      catalog,
+      intervals,
+      catalogVersion,
+      knowledge,
+      obligations,
+      problems,
+    }),
+    inputHash: hash(input),
+    connections,
+    crossConnection,
+    missingInformation: [
+      ...new Set([
+        ...connections.flatMap((r) =>
+          r.missingInformation.map((m) =>
+            prefix ? `${r.connectionId}: ${m}` : m,
+          ),
+        ),
+        ...crossConnection
+          .filter((r) => r.verdict === 'unknown')
+          .map((r) => r.reason),
+      ]),
+    ],
+  };
+  return { ...result, designHash: hash(result) };
+}
+function evaluateConnection(
+  input: DesignInput,
+  c: Connection,
+  executable: boolean,
+): ConnectionReport {
+  const relation = deriveRelation(input, c);
+  const priorities = c.experience.priorities?.length
+    ? [
+        ...c.experience.priorities,
+        ...defaultPriorities.filter(
+          (p) => !c.experience.priorities!.includes(p),
+        ),
+      ]
+    : defaultPriorities;
+  const { candidates, costRankingAvailable } = evaluateCandidates(
+    input,
+    c,
+    relation,
+    executable,
+    seedPreference(priorities),
+  );
+  const budgets = [
+    c.experience.firstAckMs,
+    c.experience.silenceBudgetMs,
+  ].filter((b): b is number => typeof b === 'number');
+  const plan = planArchitectures(
+    candidates,
+    relation,
+    priorities,
+    budgets.length ? Math.min(...budgets) : null,
+  );
+  return {
+    connectionId: c.id,
+    selectedId:
+      candidates.find((x) => x.status === 'feasible_under_declared_assumptions')
+        ?.id ?? null,
+    candidates,
+    relation,
+    patterns: plan.patterns,
+    architectures: plan.architectures,
+    selectedArchitectureId: plan.selectedArchitectureId,
+    policyDecisionNeeded: plan.policyDecisionNeeded,
+    priorities,
+    missingInformation: [
+      ...new Set([
+        ...candidates
+          .filter((x) => x.status !== 'infeasible')
+          .flatMap((x) => x.prerequisites),
+        ...plan.unknownProblems,
+      ]),
+    ],
+    costRankingAvailable,
+  };
+}
+function crossConnectionCriteria(
+  input: DesignInput,
+  reports: ConnectionReport[],
+): Criterion[] {
+  if (input.connections.length < 2) return [];
+  const calls = (r: ConnectionReport) =>
+    r.candidates.find((x) => x.id === r.selectedId)?.estimates.callsPerMinute ??
+    null;
+  const total = (rs: ConnectionReport[]) =>
+    rs.some((r) => calls(r) === null)
+      ? null
+      : rs.reduce((a, r) => a + calls(r)!, 0);
+  const criteria: Criterion[] = [];
+  const budget = input.infrastructure.callBudgetPerMinute;
+  if (budget !== null) {
+    const sum = total(reports);
+    criteria.push({
+      id: 'shared-call-budget',
+      verdict:
+        sum === null
+          ? 'unknown'
+          : sum <= budget
+            ? 'pass_under_assumptions'
+            : 'fail',
+      reason:
+        'Selected designs across all connections must fit the shared call budget.',
+      actual: sum,
+      required: budget,
+      evidence: [],
+    });
+  }
+  const groups = new Map<string, number[]>();
+  input.connections.forEach((c, i) => {
+    const key = `${c.downstreamSystemId}/${c.downstreamOperationId}`;
+    groups.set(key, [...(groups.get(key) ?? []), i]);
+  });
+  for (const [key, members] of groups) {
+    if (members.length < 2) continue;
+    const quotas = members.map(
+      (i) => input.connections[i].profile.callsPerMinute.value,
+    );
+    const quota = quotas.includes(null)
+      ? null
+      : Math.min(...(quotas as number[]));
+    const sum = total(members.map((i) => reports[i]));
+    criteria.push({
+      id: `shared-quota:${key}`,
+      verdict:
+        sum === null || quota === null
+          ? 'unknown'
+          : sum <= quota
+            ? 'pass_under_assumptions'
+            : 'fail',
+      reason: `Connections sharing ${key} must fit its quota together.`,
+      actual: sum,
+      required: quota,
+      evidence: members.map(
+        (i) => input.connections[i].profile.callsPerMinute.evidence,
+      ),
+    });
+  }
+  return criteria;
+}
+function evaluateCandidates(
+  input: DesignInput,
+  c: Connection,
+  relation: RelationFacts,
+  executable: boolean,
+  preference: 'latency' | 'cost' | 'simplicity',
+) {
+  const { op, downstreamInterface: di } = endpoints(input, c),
     sem = op.semantics,
-    p = input.profile,
-    w = input.workload,
-    x = input.experience,
+    p = c.profile,
+    w = c.workload,
+    x = c.experience,
     infra = input.infrastructure,
-    path = input.remainingPath;
-  const c = input.connection,
-    caller = input.systems.find((s) => s.id === c.callerSystemId)!,
-    down = input.systems.find((s) => s.id === c.downstreamSystemId)!;
-  const callerOp = caller.operations.find((o) => o.id === c.callerOperationId)!;
-  const ci = caller.interfaces.find((i) => i.id === callerOp.interfaceId)!,
-    di = down.interfaces.find((i) => i.id === op.interfaceId)!;
+    path = c.remainingPath;
   const metadataKnown =
     di.protocol === 'http' ||
     (di.protocol === 'mcp' && di.version === '2025-11-25') ||
     (di.protocol === 'a2a' && di.version === '1.0');
-  const compatible =
-    ci.direction === 'calls' &&
-    di.direction === 'exposes' &&
-    ci.protocol === di.protocol &&
-    ci.version === di.version &&
-    ci.binding === di.binding;
+  const compatible = relation.protocolCompatible.value === true;
   const adapter = compatible
     ? 0
     : c.adapter?.supplied
@@ -143,7 +252,7 @@ export function suggestDesign(raw: unknown): DesignRecommendation {
         return false;
       }
     });
-  const contractsKnown = mappingKnown(input);
+  const contractsKnown = relation.contractCompatible.value === true;
   const candidates: Candidate[] = catalog.map((template) => {
     const id = template.id,
       isCache = cached(id),
@@ -415,7 +524,7 @@ export function suggestDesign(raw: unknown): DesignRecommendation {
       ),
     );
     const config: RunnerConfig = {
-      formatVersion: '0.1-alpha.2',
+      formatVersion: '0.2-alpha.1',
       pattern: id,
       scope: sem.scope,
       keyDimensions: sem.keyDimensions,
@@ -633,7 +742,7 @@ export function suggestDesign(raw: unknown): DesignRecommendation {
       metadataUnderstood: metadataKnown,
       designEvaluated: true,
       executableHere:
-        hash(input) === hash(flightInput()) &&
+        executable &&
         id !== 'progressive' &&
         (id !== 'cached-live' || x.allowDeferred),
       prerequisites: criteria
@@ -656,39 +765,59 @@ export function suggestDesign(raw: unknown): DesignRecommendation {
   candidates.sort(
     (a, b) =>
       order[a.status] - order[b.status] ||
-      (input.preference === 'latency'
+      (preference === 'latency'
         ? (a.estimates.usefulLatencyMs ?? Infinity) -
           (b.estimates.usefulLatencyMs ?? Infinity)
-        : input.preference === 'cost' && costRankingAvailable
+        : preference === 'cost' && costRankingAvailable
           ? a.estimates.costPerMinute! - b.estimates.costPerMinute!
           : 0) ||
       a.components.length - b.components.length ||
       (a.id < b.id ? -1 : 1),
   );
-  const result = {
-    formatVersion: input.formatVersion,
-    catalogVersion,
-    catalogHash: hash({ catalog, intervals, catalogVersion }),
-    inputHash: hash(input),
-    selectedId:
-      candidates.find((c) => c.status === 'feasible_under_declared_assumptions')
-        ?.id ?? null,
-    candidates,
-    missingInformation: [
-      ...new Set(
-        candidates
-          .filter((c) => c.status !== 'infeasible')
-          .flatMap((c) => c.prerequisites),
-      ),
-    ],
-    costRankingAvailable,
-  };
-  return { ...result, designHash: hash(result) };
+  return { candidates, costRankingAvailable };
 }
+const tri = (v: boolean | null) =>
+  v === null ? 'unknown' : v ? 'true' : 'false';
 export function explainDesign(report: DesignRecommendation): string {
   return (
-    `# Plug design report\n\nFormat: ${report.formatVersion}\nCatalog: ${report.catalogVersion} (${report.catalogHash})\nInput: ${report.inputHash}\nDesign: ${report.designHash}\n\nSelected: ${report.selectedId ?? 'No feasible candidate under supplied facts and supported catalog'}\n\nCost ranking: ${report.costRankingAvailable ? 'available' : 'unavailable; missing cost is not zero'}\n\n` +
-    report.candidates
+    `# Plug design report\n\nFormat: ${report.formatVersion}\nCatalog: ${report.catalogVersion} (${report.catalogHash})\nInput: ${report.inputHash}\nDesign: ${report.designHash}\n\n` +
+    (report.crossConnection.length
+      ? `## Cross-connection checks\n\n${report.crossConnection
+          .map(
+            (r) =>
+              `- ${r.id}: ${r.verdict}. ${r.reason} Compared ${r.actual ?? 'unknown'} with ${r.required ?? 'unspecified'}.`,
+          )
+          .join('\n')}\n\n`
+      : '') +
+    report.connections.map(explainConnection).join('\n\n')
+  );
+}
+function explainConnection(r: ConnectionReport): string {
+  const selected = r.architectures.find(
+    (a) => a.id === r.selectedArchitectureId,
+  );
+  return (
+    `# Connection ${r.connectionId}\n\nSelected design: ${r.selectedId ?? 'No feasible candidate under supplied facts and supported catalog'}\n\nSelected architecture: ${selected ? selected.patterns.join(' + ') : 'None feasible under supplied facts and supported catalog'}${r.policyDecisionNeeded ? '\n\nNo unique best architecture: the top feasible architectures tie on every declared priority; one more policy decision is needed.' : ''}\n\nPriorities: ${r.priorities.join(' > ')}\n\nCost ranking: ${r.costRankingAvailable ? 'available' : 'unavailable; missing cost is not zero'}\n\n` +
+    `## Relation facts\n\n| Predicate | Value | Reason |\n|---|---|---|\n${Object.entries(
+      r.relation,
+    )
+      .map(([k, f]) => `| ${k} | ${tri(f.value)} | ${f.reason} |`)
+      .join('\n')}\n\n` +
+    `## Architecture frontier\n\n` +
+    r.architectures
+      .filter((a) => a.status !== 'infeasible')
+      .map(
+        (a) =>
+          `### ${a.patterns.join(' + ')}\n\nStatus: ${a.status}${a.frontier ? ' (frontier)' : ` (dominated by ${a.dominatedBy})`}\n\nTrade-offs: \`${JSON.stringify(a.tradeoffs)}\`\n\n\`\`\`mermaid\n${a.diagram}\n\`\`\`\n\n` +
+          `Because:\n\n${a.proof.because.map((b) => `- ${b}`).join('\n') || '- No additional problems.'}\n\n` +
+          `Unknowns:\n\n${a.proof.unknowns.map((u) => `- ${u}`).join('\n') || '- None.'}\n\n` +
+          `Rejected alternatives:\n\n${a.proof.rejectedAlternatives.map((x) => `- ${x.id}: ${x.reason}`).join('\n') || '- None.'}`,
+      )
+      .join('\n\n') +
+    `\n\n## Pattern applicability\n\n${r.patterns
+      .map((p) => `- ${p.id}: ${p.applicability}. ${p.reason}`)
+      .join('\n')}\n\n` +
+    r.candidates
       .map(
         (c) =>
           `## ${c.title}\n\nStatus: ${c.status}\n\n\`\`\`mermaid\n${c.diagram}\n\`\`\`\n\n` +

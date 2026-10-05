@@ -2,13 +2,21 @@
 title: System profiles
 ---
 
-Each profile is bound to the selected downstream operation. Facts include latency,
-percentile if known, hard timeout, quota, concurrency, response bytes, optional call
-cost, change interval, source timestamp meaning and maximum source lag. Each fact
-carries provenance and optional measurement date, window and sample size.
+Each connection's profile is bound to its selected downstream operation. Facts
+include latency, percentile if known, hard timeout, quota, concurrency, response
+bytes, optional call cost, change interval, source timestamp meaning, maximum source
+lag and optional availability. Each fact carries provenance and optional measurement
+date, window and sample size. Evidence kind `static` marks facts parsed from local
+code or contracts, with a source location.
 
-Read/write effects, idempotency, output meaning, cache permission, sharing scope and
-all output-changing dimensions are explicit. User/tenant scope requires userId or
-tenantId in the exact key. MCP annotations are hints; tool-list changes do not invalidate
-business data. A2A push/streaming flags are not freshness or latency guarantees.
-Observation-only sources require bounded lag; fetch time alone does not prove source age.
+Read/write effects, idempotency, idempotency-key support, reversibility, output
+meaning, cache permission, sharing scope and all output-changing dimensions are
+explicit. User/tenant scope requires userId or tenantId in the exact key. MCP
+annotations are hints; tool-list changes do not invalidate business data. A2A
+push/streaming flags are not freshness or latency guarantees. Observation-only
+sources require bounded lag; fetch time alone does not prove source age.
+
+Systems may declare a trust domain and messaging (delivery, ordering, durability,
+dead-letter handling); operations may declare callback, polling, streaming and
+cancellation support. An undeclared trust domain, delivery guarantee or later-result
+path stays unknown. `exactly-once-claimed` delivery is a claim to prove, not a fact.
