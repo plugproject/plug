@@ -143,8 +143,12 @@ test('own inputs, recomputation, strict requirements, downloads and mobile layou
   await page.goto('/');
   await page.screenshot({ path: 'test-results/plug-desktop.png' });
   await expect(
-    page.getByRole('heading', { name: 'Design for the experience.' }),
+    page.getByRole('heading', { name: 'Design workbench' }),
   ).toBeVisible();
+  // The workbench is the first screen: the canvas starts within the first viewport.
+  expect(
+    (await page.locator('.wf-canvas').boundingBox())!.y,
+  ).toBeLessThanOrEqual(page.viewportSize()!.height);
   await page
     .getByRole('button', { name: 'Suggest design', exact: true })
     .click();
@@ -670,6 +674,49 @@ test('operations move between systems, into new ones, and refused moves say why'
   await expect(page.locator('.draft-gaps')).toContainText(
     'Give New system an operation, or remove it.',
   );
+  expect(errors).toEqual([]);
+});
+test('a moved system keeps its place through edits; Re-layout and the map toggle recover', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/');
+  await page.locator('.wf-canvas').scrollIntoViewIfNeeded();
+  const group = systemGroup(page, 'Flight-search agent');
+  const transform = () =>
+    group.evaluate((el) => (el as HTMLElement).style.transform);
+  // Drag the system by its header towards the lower middle of the canvas.
+  const canvas = (await page.locator('.wf-canvas').boundingBox())!;
+  const box = await settledBox(group);
+  await page.mouse.move(box.x + box.width / 2, box.y + 14);
+  await page.mouse.down();
+  await page.mouse.move(
+    canvas.x + canvas.width / 2,
+    canvas.y + canvas.height - 80,
+    { steps: 15 },
+  );
+  await page.mouse.up();
+  const placed = await transform();
+  expect(placed).not.toBe('');
+  // Later edits lay out the rest of the graph around the hand-placed system.
+  await page.getByRole('button', { name: '+ Add system' }).click();
+  await settledBox(systemGroup(page, 'New system'));
+  expect(await transform()).toBe(placed);
+  // ↺ Re-layout returns it to the flow.
+  await page.getByRole('button', { name: '↺ Re-layout' }).click();
+  await expect.poll(transform).not.toBe(placed);
+  // The overview map can be put away and brought back; Fit view reframes.
+  await expect(page.locator('.react-flow__minimap')).toBeVisible();
+  const map = page.getByRole('button', { name: 'Overview map' });
+  await map.click();
+  await expect(page.locator('.react-flow__minimap')).toHaveCount(0);
+  await expect(map).toHaveAttribute('aria-pressed', 'false');
+  await map.click();
+  await expect(page.locator('.react-flow__minimap')).toBeVisible();
+  await page.getByRole('button', { name: 'Fit view', exact: true }).click();
+  await expect(operationNode(page, 'search')).toBeVisible();
   expect(errors).toEqual([]);
 });
 test('menus create at any level, and one operation fans out to many', async ({

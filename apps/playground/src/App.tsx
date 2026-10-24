@@ -708,80 +708,31 @@ function App() {
         <a className="brand" href="#">
           plug<span className="brand-dot">.</span>
         </a>
+        <span className="env">
+          {workspace ? 'local workbench' : 'public alpha'} · 0.2
+        </span>
         <nav aria-label="Page">
           {workspace && <a href="#workspace">Workspace</a>}
           <a href="#workflow">Workflow</a>
           <a href="#designs">Designs</a>
-          <a href="#try">Try it</a>
+          <a href="#try">Try</a>
         </nav>
-        <span className="version">
-          {workspace ? 'LOCAL WORKBENCH' : 'PUBLIC ALPHA'} · 0.2
-        </span>
       </header>
       <main>
-        <section className="hero">
+        <section className="intro">
           <div>
-            <div className="eyebrow">
-              <span /> YOUR SYSTEMS. A BETTER CONNECTION.
-            </div>
-            <h1>
-              Design for the
-              <br />
-              <em>experience.</em>
-            </h1>
+            <h1>Design workbench</h1>
             <p>
-              Describe what your systems can do and what your users need. Find
-              the architecture that closes the gap—with the evidence to explain
-              it.
-            </p>
-            <a className="button dark" href="#workflow">
-              Explore a design <span>↗</span>
-            </a>
-          </div>
-          <div
-            className="hero-visual"
-            aria-label="Slow source connected through a cache to a fast experience"
-          >
-            <div className="visual-caption">
-              THE FLIGHT SEARCH EXAMPLE <span>01 / 01</span>
-            </div>
-            <div className="source-node">
-              <span className="node-icon">↗</span>
-              <div>
-                Flight aggregator<small>Real HTTP source</small>
-              </div>
-              <strong>15s</strong>
-            </div>
-            <div className="connector">
-              <span>↓</span> Move work before the request
-            </div>
-            <div className="cache-node">
-              <span className="node-icon">▦</span>
-              <div>
-                Refresh + exact-key cache<small>Introduced by Plug</small>
-              </div>
-              <span className="plus">+</span>
-            </div>
-            <div className="connector">
-              <span>↓</span> Serve eligible indicative options
-            </div>
-            <div className="result-node">
-              <span>Useful response target</span>
-              <strong>&lt; 2s</strong>
-            </div>
-            <p>
-              Same slow source. Different architecture.
-              <br />
-              Freshness and coverage decide whether it works.
+              Describe up to eight systems and the experience each connection
+              must meet. Plug derives relation facts, evaluates six seed designs
+              and composes architectures ranked by your priorities, each with
+              its proof. Analysis is deterministic and never calls an endpoint.
             </p>
           </div>
-        </section>
-        <div className="workspace-heading">
-          <span>YOUR DESIGN WORKSPACE</span>
           <button className="text-button" onClick={() => void reset()}>
             ↺ Restore flight example
           </button>
-        </div>
+        </section>
         {workspace && (
           <section id="workspace" className="panel workspace-panel">
             <div className="section-heading">
@@ -830,18 +781,25 @@ function App() {
               <p>
                 Systems are groups and their operations are nodes. Each edge is
                 one connection with its own required experience and priorities.
-                Double-click empty canvas to add a system, or inside a system to
-                add an operation; right-click anything for its actions. Hover an
-                operation and drag the + on either edge to an operation of
-                another system to connect them, or click the + to pick one; drop
-                on empty canvas to add a connected system. Add connection lets
-                you click the caller, then the operation it calls. Drag an
-                operation onto another system to move it there, or onto empty
-                canvas to give it a system of its own. × removes anything, with
-                the connections it takes part in; undo brings it back. For MCP
-                and A2A systems, enter the server in the inspector to list its
-                tools or skills.
               </p>
+              <details className="help">
+                <summary>Editing the canvas</summary>
+                <p>
+                  Double-click empty canvas to add a system, or inside a system
+                  to add an operation; right-click anything for its actions.
+                  Hover an operation and drag the + on either edge to an
+                  operation of another system to connect them, or click the + to
+                  pick one; drop on empty canvas to add a connected system. Add
+                  connection lets you click the caller, then the operation it
+                  calls. Drag an operation onto another system to move it there,
+                  or onto empty canvas to give it a system of its own. Drag a
+                  system anywhere to arrange the canvas; it stays where you put
+                  it through later edits until ↺ Re-layout. × removes anything,
+                  with the connections it takes part in; undo brings it back.
+                  For MCP and A2A systems, enter the server in the inspector to
+                  list its tools or skills.
+                </p>
+              </details>
             </div>
             <span className="tag">Analysis only · no credentials</span>
           </div>
@@ -1513,7 +1471,8 @@ function App() {
         </section>
         <footer>
           <span className="brand">plug.</span>
-          <p>Evidence before confidence. Architecture before orchestration.</p>
+          <span className="env">0.2.0-alpha.1</span>
+          <span className="footer-spacer" />
           <a
             href="https://github.com/plugproject/plug/issues"
             target="_blank"

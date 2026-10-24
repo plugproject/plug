@@ -628,6 +628,9 @@ function Canvas({
   );
   const [boxes, setBoxes] = useState<Map<string, Box> | null>(null);
   const [tick, setTick] = useState(0);
+  /** Hand-placed systems; their drags survive re-layouts until ↺ Re-layout. */
+  const manual = useRef(new Map<string, { x: number; y: number }>());
+  const [overview, setOverview] = useState(true);
   const [nodes, setNodes, onNodesChange] = useNodesState<
     SystemNode | OperationNode
   >([]);
@@ -808,6 +811,12 @@ function Canvas({
         ),
       );
   };
+  /** Lays everything out again; hand-placed systems rejoin the flow. */
+  const relayout = () => {
+    manual.current.clear();
+    setTick((n) => n + 1);
+  };
+  const fit = () => void flow.fitView({ padding: 0.12, duration: 300 });
   const show = (target: MenuTarget, at: { x: number; y: number }) => {
     restoreFocus.current = document.activeElement as HTMLElement | null;
     setMenu((old) => ({ n: (old?.n ?? 0) + 1, at, target }));
@@ -911,7 +920,8 @@ function Canvas({
               blocked: connectionLimit(),
               run: () => onLinkingChange(true),
             },
-        { label: 'Re-layout', run: () => setTick((n) => n + 1) },
+        { label: 'Fit view', run: fit },
+        { label: 'Re-layout', run: relayout },
         {
           label: fullscreen ? 'Exit fullscreen' : 'Fullscreen',
           run: onToggleFullscreen,
@@ -1172,12 +1182,19 @@ function Canvas({
     });
   }, [built, setNodes]);
   useEffect(() => {
-    setNodes(built);
+    for (const id of manual.current.keys())
+      if (!built.some((n) => n.id === id)) manual.current.delete(id);
+    setNodes(
+      built.map((n) => {
+        const at = manual.current.get(n.id);
+        return at ? { ...n, position: at } : n;
+      }),
+    );
     const frame = requestAnimationFrame(
       () => void flow.fitView({ padding: 0.12, duration: 0 }),
     );
     return () => cancelAnimationFrame(frame);
-    // Dragged positions reset and the view refits only when a new layout arrives.
+    // A new layout places everything except hand-placed systems, then refits.
   }, [boxes]);
   const size = useStore((s) => `${s.width}x${s.height}`);
   const wasFull = useRef(fullscreen);
@@ -1441,6 +1458,10 @@ function Canvas({
         }}
         onNodeDragStop={(_, node) => {
           setDrag(null);
+          if (node.type === 'system') {
+            manual.current.set(node.id, { ...node.position });
+            return;
+          }
           if (node.type !== 'operation') return;
           const drop = dropFor(node);
           if (drop.home || drop.blocked) snapBack(node.id);
@@ -1511,7 +1532,21 @@ function Canvas({
       >
         <Background gap={24} />
         <Controls showInteractive={false} />
-        <MiniMap pannable zoomable style={{ width: 132, height: 92 }} />
+        {overview && (
+          <MiniMap
+            pannable
+            zoomable
+            style={{ width: 132, height: 92 }}
+            nodeColor={(n) =>
+              (n.data as { focused?: boolean }).focused
+                ? '#89a254'
+                : n.type === 'system'
+                  ? '#dfe5d2'
+                  : '#ffffff'
+            }
+            maskColor="rgba(38, 62, 43, 0.08)"
+          />
+        )}
       </ReactFlow>
       {linkFrom && (
         <LinkPreview
@@ -1549,7 +1584,31 @@ function Canvas({
         />
       )}
       <span className="wf-canvas-tools">
-        <button className="text-button" onClick={() => setTick((t) => t + 1)}>
+        <button
+          type="button"
+          className="text-button wf-tools-extra"
+          aria-label="Fit view"
+          title="Bring the whole workflow into view"
+          onClick={fit}
+        >
+          ▣
+        </button>
+        <button
+          type="button"
+          className="text-button wf-tools-extra"
+          aria-label="Overview map"
+          aria-pressed={overview}
+          title={overview ? 'Hide the overview map' : 'Show the overview map'}
+          onClick={() => setOverview(!overview)}
+        >
+          ▦
+        </button>
+        <span className="wf-tools-divider wf-tools-extra" aria-hidden="true" />
+        <button
+          className="text-button"
+          title="Lay the workflow out again; systems you moved rejoin the flow"
+          onClick={relayout}
+        >
           ↺ Re-layout
         </button>
         <button
