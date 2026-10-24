@@ -219,9 +219,8 @@ context. No durable cache, distributed scheduler, restart recovery, OAuth sign-i
 for discovery, arbitrary expression evaluation, or model-assisted extraction.
 
 **Release status:** no public deployment or public URL has been verified.
-Distribution license awaits owner choice; this repository is not yet claimed as
-open source and npm publication is disabled. See
-[release notes](RELEASE_NOTES.md).
+Plug is licensed under the [MIT License](LICENSE). npm publication remains
+disabled. See [release notes](RELEASE_NOTES.md).
 
 ## Contributing
 

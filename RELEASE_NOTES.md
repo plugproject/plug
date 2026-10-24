@@ -135,15 +135,16 @@ under declared synthetic assumptions, not measured production traffic guarantees
 Input hash: `67f171929ac7196ac47bfedea59a131b3edfbdb6a834937cc7be9cf22bf203c4`.
 Design hash: `0208b69c5676dd668ccc1536bfed07959a876848e085fc7929a1608b7e619291`.
 
+The owner selected the MIT License for Plug on October 25, 2026. The repository
+and reference package include the license; npm publication remains disabled.
+
 ## Remaining release steps
 
-1. Owner chooses a distribution license. Until then the package remains private
-   and UNLICENSED; no open-source or public npm publication is claimed.
-2. Owner configures a private security reporting route and actual maintainers.
-3. Commit/push the reviewed implementation and connect the repository to Render
+1. Owner configures a private security reporting route and actual maintainers.
+2. Commit/push the reviewed implementation and connect the repository to Render
    using `render.yaml`. Supply `APP_ORIGIN` and verify the hosting proxy topology
    before setting `TRUST_PROXY_HOPS`. No Render API credential was available here.
-4. On the host-provided domain, repeat streaming, real source/refresh, isolation,
+3. On the host-provided domain, repeat streaming, real source/refresh, isolation,
    cancellation, per-IP and four-session-cap smoke checks. Record the deployed
    commit and public URL here. Free-tier cold starts remain a documented limitation.
 
