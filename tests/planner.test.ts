@@ -7,6 +7,7 @@ import {
   dominates,
   evaluatePatterns,
   planArchitectures,
+  verifyArchitecture,
 } from '../packages/plug/src/recommender/planner';
 import { knowledge } from '../packages/plug/src/patterns/knowledge';
 import type {
@@ -223,6 +224,99 @@ describe('pattern knowledge base', () => {
     expect(plan.selectedArchitectureId).toBe(
       'scheduled-cache+boundary-authentication',
     );
+  });
+});
+
+describe('architecture check mode', () => {
+  it('canonicalizes a closed stack and returns its complete candidate', () => {
+    const { report } = flight();
+    const base = report.candidates.find(
+      (candidate) => candidate.id === 'scheduled-cache',
+    )!;
+    const verification = verifyArchitecture(
+      base,
+      ['timeout', 'scheduled-cache', 'retry-backoff', 'timeout'],
+      relationWith({ availabilityShortfall: true }),
+      ['correctness'],
+      null,
+    );
+    expect(verification.verdict).toBe('verified');
+    expect(verification.status).toBe('feasible_under_declared_assumptions');
+    expect(verification.candidate?.patterns).toEqual([
+      'scheduled-cache',
+      'retry-backoff',
+      'timeout',
+    ]);
+    expect(verification.candidate?.obligations).toEqual([
+      { id: 'bounded_attempt', coveredBy: 'timeout', dischargedBy: null },
+      {
+        id: 'duplicate_attempts',
+        coveredBy: null,
+        dischargedBy: 'unsafeRetry',
+      },
+    ]);
+  });
+  it('rejects unknown patterns, conflicts in either direction and open closure', () => {
+    const { report } = flight();
+    const base = report.candidates.find(
+      (candidate) => candidate.id === 'scheduled-cache',
+    )!;
+    const relation = relationWith({ availabilityShortfall: true });
+    const unknown = verifyArchitecture(
+      base,
+      ['not-in-the-catalog'],
+      relation,
+      null,
+    );
+    expect(unknown).toMatchObject({
+      verdict: 'unknown_pattern',
+      status: null,
+      candidate: null,
+    });
+    expect(unknown.reason).toContain('not-in-the-catalog');
+
+    const retry = knowledge.find((pattern) => pattern.id === 'retry-backoff')!;
+    const originalConflicts = retry.conflicts;
+    try {
+      retry.conflicts = [...originalConflicts, 'timeout'];
+      const conflict = verifyArchitecture(
+        base,
+        ['timeout', 'retry-backoff'],
+        relation,
+        null,
+      );
+      expect(conflict).toMatchObject({
+        verdict: 'conflict',
+        status: 'infeasible',
+        candidate: null,
+      });
+      expect(conflict.reason).toContain('retry-backoff');
+      expect(conflict.reason).toContain('timeout');
+    } finally {
+      retry.conflicts = originalConflicts;
+    }
+
+    const obligation = verifyArchitecture(
+      base,
+      ['rate-limiting'],
+      relationWith({}),
+      null,
+    );
+    expect(obligation).toMatchObject({
+      verdict: 'unclosed',
+      status: 'infeasible',
+      candidate: null,
+    });
+    expect(obligation.reason).toContain('overload_rejection');
+
+    const problem = verifyArchitecture(
+      base,
+      [],
+      relationWith({ trustBoundaryCrossed: true }),
+      null,
+    );
+    expect(problem.verdict).toBe('unclosed');
+    expect(problem.reason).toContain('trust_boundary');
   });
 });
 

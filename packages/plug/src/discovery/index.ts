@@ -4,13 +4,16 @@ import {
   StreamableHTTPError,
 } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { McpError } from '@modelcontextprotocol/sdk/types.js';
+import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 import { guardDocument } from '../contracts/index';
 import type { JsonObject } from '../contracts/index';
+import { openApiOperations } from '../importers/index';
 /**
  * Live discovery for the local workbench only. MCP discovery initializes a
  * Streamable HTTP session, lists tools and ends the session; it never calls a
  * tool. A2A discovery reads the public Agent Card; it never sends a message.
+ * HTTP discovery reads one OpenAPI document; it never calls an operation.
  * Headers are used for these requests only and are never stored or logged.
  */
 export const discoveryLimits = {
@@ -36,7 +39,7 @@ export class DiscoveryError extends Error {
   }
 }
 export interface DiscoveryRequest {
-  protocol: 'mcp' | 'a2a';
+  protocol: 'http' | 'mcp' | 'a2a';
   url: string;
   /** Sent with every discovery request; never stored. */
   headers: Record<string, string>;
@@ -53,6 +56,8 @@ export interface McpDiscovery {
   complete: boolean;
   notes: string[];
   discoveredAt: string;
+  /** Time this workbench spent fetching the listing: a synthetic observation, never a production measurement. */
+  fetchMs: number;
 }
 export interface A2aDiscovery {
   protocol: 'a2a';
@@ -61,8 +66,28 @@ export interface A2aDiscovery {
   card: JsonObject;
   notes: string[];
   discoveredAt: string;
+  /** Time this workbench spent fetching the card: a synthetic observation, never a production measurement. */
+  fetchMs: number;
 }
-export type Discovery = McpDiscovery | A2aDiscovery;
+export interface OpenApiDiscovery {
+  protocol: 'http';
+  /** The document URL that answered, without query, fragment or credentials. */
+  url: string;
+  info: { title: string; version?: string };
+  /** The document's `openapi` (or `swagger`) version string. */
+  openapiVersion: string;
+  /** First server URL resolved against the document URL; null when not http(s). */
+  serverUrl: string | null;
+  /** Drafted operations in path order; method and path sit under metadata.http. */
+  operations: JsonObject[];
+  /** False when the listing was cut at the operations bound. */
+  complete: boolean;
+  notes: string[];
+  discoveredAt: string;
+  /** Time this workbench spent fetching the document: a synthetic observation, never a production measurement. */
+  fetchMs: number;
+}
+export type Discovery = McpDiscovery | A2aDiscovery | OpenApiDiscovery;
 /** The URL as Plug may keep or show it: no credentials, query or fragment. */
 export function publicUrl(url: string | URL): string {
   const u = new URL(url);
@@ -94,8 +119,11 @@ export function parseDiscoveryRequest(body: unknown): DiscoveryRequest {
   if (!body || typeof body !== 'object' || Array.isArray(body))
     throw new DiscoveryError(400, 'Send protocol, url and headers.');
   const { protocol, url, headers = {} } = body as Record<string, unknown>;
-  if (protocol !== 'mcp' && protocol !== 'a2a')
-    throw new DiscoveryError(400, 'Discovery supports MCP and A2A.');
+  if (protocol !== 'mcp' && protocol !== 'a2a' && protocol !== 'http')
+    throw new DiscoveryError(
+      400,
+      'Discovery supports HTTP (OpenAPI), MCP and A2A.',
+    );
   if (typeof url !== 'string' || !url.trim())
     throw new DiscoveryError(400, 'Enter the server URL.');
   if (url.length > discoveryLimits.urlLength)
@@ -303,7 +331,7 @@ const toolsPage = z.looseObject({
 export async function discoverMcp(
   request: DiscoveryRequest,
   options: { signal?: AbortSignal; clientVersion?: string } = {},
-): Promise<McpDiscovery> {
+): Promise<Omit<McpDiscovery, 'fetchMs'>> {
   const url = new URL(request.url);
   const limit = deadline(options.signal);
   const transport = new StreamableHTTPClientTransport(url, {
@@ -414,11 +442,12 @@ async function getWithinOrigin(
   url: URL,
   headers: Record<string, string>,
   signal: AbortSignal,
+  accept = 'application/json',
 ): Promise<{ response: Response; at: URL }> {
   let at = url;
   for (let hops = 0; ; hops++) {
     const response = await fetch(at, {
-      headers: { ...headers, accept: 'application/json' },
+      headers: { ...headers, accept },
       redirect: 'manual',
       signal,
     });
@@ -465,7 +494,7 @@ export function agentCardUrls(url: string): URL[] {
 export async function discoverA2a(
   request: DiscoveryRequest,
   options: { signal?: AbortSignal } = {},
-): Promise<A2aDiscovery> {
+): Promise<Omit<A2aDiscovery, 'fetchMs'>> {
   const url = new URL(request.url);
   const limit = deadline(options.signal);
   const tried: string[] = [];
@@ -542,11 +571,142 @@ export async function discoverA2a(
     limit.done();
   }
 }
-export function discover(
+const isObject = (v: unknown): v is Record<string, unknown> =>
+  !!v && typeof v === 'object' && !Array.isArray(v);
+/** Reads one OpenAPI document and drafts its operations; it never calls an operation. */
+export async function discoverOpenApi(
+  request: DiscoveryRequest,
+  options: { signal?: AbortSignal } = {},
+): Promise<Omit<OpenApiDiscovery, 'fetchMs'>> {
+  const url = new URL(request.url);
+  const limit = deadline(options.signal);
+  try {
+    const { response, at } = await getWithinOrigin(
+      url,
+      request.headers,
+      limit.signal,
+      'application/json, application/yaml;q=0.9, */*;q=0.8',
+    );
+    const where = publicUrl(at);
+    if (response.status === 401 || response.status === 403) {
+      await response.body?.cancel();
+      throw new DiscoveryError(
+        502,
+        `${where} refused the request (HTTP ${response.status}). Add the header it expects, for example Authorization: Bearer <token>.`,
+      );
+    }
+    if (!response.ok) {
+      await response.body?.cancel();
+      throw new DiscoveryError(
+        502,
+        `${where} answered HTTP ${response.status}.`,
+      );
+    }
+    const text = await readCapped(response, discoveryLimits.responseBytes);
+    let doc: unknown;
+    try {
+      doc = JSON.parse(text);
+    } catch {
+      try {
+        doc = parseYaml(text, { maxAliasCount: 0 });
+      } catch {
+        throw new DiscoveryError(502, `${where} is not JSON or YAML.`);
+      }
+    }
+    try {
+      guardDocument(doc);
+    } catch (e) {
+      throw new DiscoveryError(
+        502,
+        `The document at ${where} is unsupported: ${(e as Error).message}.`,
+      );
+    }
+    const d = isObject(doc) ? doc : {};
+    const version =
+      typeof d.openapi === 'string'
+        ? d.openapi
+        : typeof d.swagger === 'string'
+          ? d.swagger
+          : null;
+    if (!version || !isObject(d.paths))
+      throw new DiscoveryError(
+        502,
+        `${where} is not an OpenAPI document: it declares openapi (or swagger) and paths. Use the document URL, often /openapi.json.`,
+      );
+    const operations = openApiOperations(d, where, 'http');
+    if (!operations.length)
+      throw new DiscoveryError(
+        502,
+        `The OpenAPI document at ${where} lists no operations.`,
+      );
+    const notes: string[] = [];
+    let complete = true;
+    if (operations.length > discoveryLimits.tools) {
+      complete = false;
+      notes.push(
+        `Listing stopped after ${discoveryLimits.tools} operations; more exist.`,
+      );
+    }
+    if (!/^3\./.test(version))
+      notes.push(
+        'Plug reads OpenAPI 3.x; this version is preserved without schema claims.',
+      );
+    const first = Array.isArray(d.servers)
+      ? d.servers.find((s: unknown) => isObject(s) && typeof s.url === 'string')
+      : undefined;
+    // Per OpenAPI, a missing servers entry means `/`, relative to the document.
+    let serverUrl: string | null = null;
+    try {
+      const u = new URL(
+        first ? ((first as Record<string, unknown>).url as string) : '/',
+        at,
+      );
+      if ((u.protocol === 'http:' || u.protocol === 'https:') && !u.username)
+        serverUrl = publicUrl(u);
+    } catch {
+      serverUrl = null;
+    }
+    if (!first)
+      notes.push(
+        'The document names no server; the endpoint defaults to the document origin.',
+      );
+    const info = isObject(d.info) ? d.info : {};
+    return {
+      protocol: 'http',
+      url: where,
+      info: {
+        title:
+          typeof info.title === 'string' && info.title ? info.title : at.host,
+        ...(typeof info.version === 'string' ? { version: info.version } : {}),
+      },
+      openapiVersion: version,
+      serverUrl,
+      operations: operations.slice(
+        0,
+        discoveryLimits.tools,
+      ) as unknown as JsonObject[],
+      complete,
+      notes,
+      discoveredAt: new Date().toISOString(),
+    };
+  } catch (e) {
+    throw explain(e, limit.signal, url);
+  } finally {
+    limit.done();
+  }
+}
+export async function discover(
   request: DiscoveryRequest,
   options: { signal?: AbortSignal; clientVersion?: string } = {},
 ): Promise<Discovery> {
-  return request.protocol === 'mcp'
-    ? discoverMcp(request, options)
-    : discoverA2a(request, options);
+  const started = Date.now();
+  const found =
+    request.protocol === 'mcp'
+      ? await discoverMcp(request, options)
+      : request.protocol === 'http'
+        ? await discoverOpenApi(request, options)
+        : await discoverA2a(request, options);
+  // Wall-clock time of this workbench's fetch: a synthetic observation that
+  // may inform declarations, never a production measurement.
+  return { ...found, fetchMs: Date.now() - started } as Discovery;
 }

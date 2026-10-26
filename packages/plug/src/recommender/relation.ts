@@ -3,11 +3,31 @@ import type {
   Connection,
   DesignInput,
   Evidence,
+  Interface,
   JsonObject,
   RelationFact,
   RelationFacts,
 } from '../contracts/index';
 import { hash } from './policy';
+const schemaValidationCache = new Map<string, boolean>();
+function operationSchemaCompiles(
+  schema: JsonObject,
+  protocol: Interface['protocol'],
+): boolean {
+  const key = `${protocol}\0${hash(schema)}`;
+  const cached = schemaValidationCache.get(key);
+  if (cached !== undefined) return cached;
+  let valid = true;
+  try {
+    compileOperationSchema(schema, protocol);
+  } catch {
+    valid = false;
+  }
+  schemaValidationCache.set(key, valid);
+  if (schemaValidationCache.size > 256)
+    schemaValidationCache.delete(schemaValidationCache.keys().next().value!);
+  return valid;
+}
 const sum = (...values: (number | null)[]) =>
   values.some((v) => v === null)
     ? null
@@ -51,20 +71,25 @@ export function contractCompatibility(
     !op.outputSchema
   )
     return null;
-  try {
-    for (const system of [caller, downstream])
-      for (const operation of system.operations) {
-        const protocol = system.interfaces.find(
-          (i) => i.id === operation.interfaceId,
-        )!.protocol;
-        if (operation.inputSchema)
-          compileOperationSchema(operation.inputSchema, protocol);
-        if (operation.outputSchema)
-          compileOperationSchema(operation.outputSchema, protocol);
-      }
-  } catch {
+  if (
+    !operationSchemaCompiles(
+      callerOp.inputSchema,
+      caller.interfaces.find((i) => i.id === callerOp.interfaceId)!.protocol,
+    ) ||
+    !operationSchemaCompiles(
+      callerOp.outputSchema,
+      caller.interfaces.find((i) => i.id === callerOp.interfaceId)!.protocol,
+    ) ||
+    !operationSchemaCompiles(
+      op.inputSchema,
+      downstream.interfaces.find((i) => i.id === op.interfaceId)!.protocol,
+    ) ||
+    !operationSchemaCompiles(
+      op.outputSchema,
+      downstream.interfaces.find((i) => i.id === op.interfaceId)!.protocol,
+    )
+  )
     return null;
-  }
   const covers = (
     source: JsonObject,
     target: JsonObject,
@@ -90,15 +115,50 @@ export function contractCompatibility(
     covers(op.outputSchema, callerOp.outputSchema, c.outputMapping)
   );
 }
+/**
+ * The caller interface able to call the downstream's exposed interface: the
+ * caller operation's own when it matches, else any `calls` interface the
+ * caller system declares. Null when none matches.
+ */
+export function callingInterface(
+  input: DesignInput,
+  c: Connection,
+): Interface | null {
+  const {
+    caller,
+    callerInterface: ci,
+    downstreamInterface: di,
+  } = endpoints(input, c);
+  if (di.direction !== 'exposes') return null;
+  const canCall = (i: Interface) =>
+    i.direction === 'calls' &&
+    i.protocol === di.protocol &&
+    i.version === di.version &&
+    i.binding === di.binding;
+  return canCall(ci) ? ci : (caller.interfaces.find(canCall) ?? null);
+}
 export function protocolCompatible(input: DesignInput, c: Connection) {
-  const { callerInterface: ci, downstreamInterface: di } = endpoints(input, c);
-  return (
-    ci.direction === 'calls' &&
-    di.direction === 'exposes' &&
-    ci.protocol === di.protocol &&
-    ci.version === di.version &&
-    ci.binding === di.binding
-  );
+  return callingInterface(input, c) !== null;
+}
+/**
+ * The connection's recorded equivalence judgment, only while it still binds:
+ * the judged strings must equal the current output meaning and required
+ * useful output. Anything else returns null and the strict comparison rules.
+ */
+export function judgedEquivalence(
+  c: Connection,
+  outputMeaning: string | null,
+  usefulOutput: string,
+) {
+  const j = c.semanticEquivalence;
+  return j &&
+    j.equivalent !== null &&
+    outputMeaning !== null &&
+    outputMeaning !== usefulOutput &&
+    j.outputMeaning === outputMeaning &&
+    j.usefulOutput === usefulOutput
+    ? j
+    : null;
 }
 /** Complete live-path point estimate including adapter overhead; null when any part is unknown. */
 export function livePathMs(input: DesignInput, c: Connection) {
@@ -136,7 +196,9 @@ export function deriveRelation(
     infra = input.infrastructure;
   const live = livePathMs(input, c);
   const liveEvidence = [p.latencyMs.evidence, c.remainingPath.agentMs.evidence];
-  const compatible = protocolCompatible(input, c);
+  const judged = judgedEquivalence(c, sem.outputMeaning, x.usefulOutput);
+  const via = callingInterface(input, c);
+  const compatible = via !== null;
   const contract = contractCompatibility(input, c);
   const budgets = [x.firstAckMs, x.silenceBudgetMs].filter(
     (b) => b !== undefined,
@@ -286,9 +348,11 @@ export function deriveRelation(
   return {
     protocolCompatible: fact(
       compatible,
-      compatible
-        ? 'Caller calls the exposed protocol, version and binding.'
-        : `Caller ${callerInterface.direction} ${callerInterface.protocol} ${callerInterface.version} ${callerInterface.binding}; downstream ${downstreamInterface.direction} ${downstreamInterface.protocol} ${downstreamInterface.version} ${downstreamInterface.binding}.`,
+      via
+        ? via === callerInterface
+          ? 'Caller calls the exposed protocol, version and binding.'
+          : `The caller's ${via.id} interface calls the exposed ${downstreamInterface.protocol} ${downstreamInterface.version} ${downstreamInterface.binding}.`
+        : `Caller ${callerInterface.direction} ${callerInterface.protocol} ${callerInterface.version} ${callerInterface.binding}; downstream ${downstreamInterface.direction} ${downstreamInterface.protocol} ${downstreamInterface.version} ${downstreamInterface.binding}; no caller interface matches.`,
     ),
     contractCompatible: fact(
       contract,
@@ -299,11 +363,16 @@ export function deriveRelation(
           : 'Explicit mappings do not cover the structured contracts.',
     ),
     semanticMatch: fact(
-      sem.outputMeaning === null ? null : sem.outputMeaning === x.usefulOutput,
+      sem.outputMeaning === null
+        ? null
+        : sem.outputMeaning === x.usefulOutput ||
+            (judged ? judged.equivalent : false),
       sem.outputMeaning === null
         ? 'The downstream output meaning is unknown.'
-        : `Output "${sem.outputMeaning}" compared with required "${x.usefulOutput}".`,
-      [sem.evidence],
+        : judged
+          ? `Judged ${judged.equivalent ? 'equivalent' : 'not equivalent'}: "${sem.outputMeaning}" against required "${x.usefulOutput}". ${judged.evidence.note}`
+          : `Output "${sem.outputMeaning}" compared with required "${x.usefulOutput}".`,
+      judged ? [sem.evidence, judged.evidence] : [sem.evidence],
     ),
     deadlineRisk: fact(
       live === null ? null : live > x.latencyTargetMs,

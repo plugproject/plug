@@ -37,8 +37,18 @@ Install the resulting tarball in a fresh directory outside this workspace with
 remains disabled.
 
 ```sh
+npx plug setup                 # optional guided model-provider setup
+npx plug setup --check         # non-secret readiness status
 npx plug ui
 ```
+
+Core indexing, analysis and OpenSpec/MCP reads need no environment variables.
+The setup prompt writes the selected workspace's ignored mode-`0600`
+`.env.local`. Jev needs `TYPESAFE_API_KEY` plus `PLUG_JUDGE_MODEL`; completion
+drafting needs an Anthropic or OpenAI key plus `PLUG_DRAFT_MODEL`; design review
+reuses the draft provider/model unless `PLUG_REVIEW_PROVIDER` and
+`PLUG_REVIEW_MODEL` override them. A binding's `${env:NAME}` header reference
+requires that project-specific variable only when the binding executes.
 
 The local workbench serves the same UI on http://127.0.0.1:4319 (loopback only;
 `--port` and `--workspace` change the defaults). If the current project is not
@@ -63,8 +73,8 @@ one onto any part of an operation of another system to add a connection (the lef
 draws it from a caller), or drop the drag on empty canvas to create a new connected
 system. Click a **+** instead to pick from every operation it can still call or serve;
 pick as many as you need. **+ Add connection** connects by clicking: click the calling
-operation, then the operation it calls; Escape cancels. A design holds up to eight
-systems, four operations per system and twelve connections.
+operation, then the operation it calls; Escape cancels. The serialized design has
+no fixed count ceiling; the editor keeps documents and execution resource-bounded.
 
 Drag an operation onto another system to move it there, or onto empty canvas to give
 it a new system with the same interface. Its connections follow: as when rewiring, a
@@ -83,13 +93,55 @@ another operation to rewire it. **↶** and **↷**, or Ctrl/⌘+Z and Shift+Ctr
 and redo the last 50 changes. **⤢ Fullscreen** gives the editor the whole screen;
 Escape returns. Suggest design and compare each connection's architecture frontier.
 
-For an MCP server or A2A agent, set the system's **Protocol** and keep **Direction** at
-**Exposes**; the inspector then takes the server's URL. In the local workbench, add any
-request headers the server needs (they are used for that request and never saved) and
-choose **Discover tools** or **Discover skills**. Plug lists the server's tools, or
-reads the agent's card, without calling anything; pick up to four as the system's
-operations and apply. The hosted playground never contacts your servers: paste a
-tools/list response or Agent Card under **Import MCP / A2A metadata** instead.
+For a system that exposes its interface, set its **Protocol**, and keep **Direction**
+at **Exposes**; the inspector then takes the server's URL — the MCP endpoint, the
+agent or Agent Card URL, or the OpenAPI document URL for a plain HTTP service. A
+freshly added system focuses this field: index the server before describing it by
+hand. In the local workbench, add any request headers the server needs (they are
+used for that request and never saved) and press Enter or choose **Discover
+tools**, **Discover skills** or **Discover operations**. Plug lists the server's
+tools, reads the agent's card or reads the OpenAPI document, without calling
+anything, and notes how long its own fetch took — a synthetic observation, not a
+production measurement. Pick the system operations you need and apply. The
+hosted playground never contacts your servers: paste a tools/list response, Agent
+Card or OpenAPI document under **Import MCP / A2A / OpenAPI metadata** instead.
+
+Before a local host is added, Plug explains that every exposed integration point
+becomes eligible for inspection. Choose **Add and inspect** to run bounded safe
+reads now, or **Add without inspecting** to defer them. The manifest panel shows
+vantage, measurement window, sample size, latency and source timestamp evidence
+per operation. **Re-inspect** refreshes it. These observations are from your local
+workbench, not production measurements or an SLO; writes and unknown-effect
+operations are never automatically called.
+
+On an edge, **Facts still needed** lists the declarations the analysis is waiting
+on. In the local workbench, **Draft missing facts** can propose an output meaning,
+complete contract mappings or an explicitly documented per-minute downstream
+quota. Configure `PLUG_DRAFT_PROVIDER`, its API key and an exact
+`PLUG_DRAFT_MODEL`. Every proposal must quote the supplied metadata verbatim,
+passes mechanical value checks, and is independently cross-checked by Jev when
+TypeSafe is configured. Drafting changes nothing: inspect the quote and choose
+**Adopt** to make the declaration (or ignore it). Cache permission, workload,
+trust, latency and availability are never drafted.
+
+When your required output and the downstream's declared output meaning are
+different texts, the strict comparison fails; in the local workbench **Judge
+equivalence** records one typed model judgment over exactly those texts (set
+`TYPESAFE_API_KEY`, `PLUG_JUDGE_PROVIDER=typesafe` and an exact
+`PLUG_JUDGE_MODEL`; `plug ui` loads them from the workspace's ignored
+`.env.local`). Jev returns a calibrated Noul and code classifies values at or
+above 0.7 as equivalent. Anthropic and OpenAI remain completion-provider
+alternatives. The verdict is pinned to the judged strings — edit either and it
+no longer applies.
+
+After analysis, compare the deterministic **Engine verdict** with the separate
+**Demonstration** record. **Verify as-is** exercises the direct edge and **Verify
+selected design** runs a supported seed design against an authorized REST binding,
+within the same 120-second and resource limits. A local critic can review the
+bounded report, with Jev independently checking typed claims. Review suggestions do
+not alter the graph: inspect their exact citations, then explicitly **Adopt** one
+engine-admissible architecture or **Clear adoption**. Plug re-checks the pin when
+facts change.
 
 **↓ Download OpenSpec** saves the graph as an
 [Open Workflow Specification](https://open-workflow-specification.org/) document,
@@ -107,6 +159,7 @@ line run:
 ```sh
 npx plug spec input.json        # or a workflow.yaml; no argument re-applies .plug/workflow.yaml
 npx plug mcp install --ide cursor
+npx plug skill install --ide cursor
 ```
 
 `.plug/workflow.yaml` is the spec of record, next to `design-input.json`,
@@ -116,20 +169,28 @@ first. `plug mcp install` registers `plug mcp` in project-scoped configuration
 (`--ide cursor`, `vscode` or `claude`; `generic` prints the entry). The agent can then
 read the spec and apply changes through `plug_update_spec`, which validates and
 re-analyzes them. When the workflow file changes outside Plug, the workbench flags
-it and **Open workspace spec** reviews the edit on the graph.
+it and **Open workspace spec** reviews the edit on the graph. The **Spec history**
+panel lists up to 50 content-addressed Plug revisions plus read-only Git history;
+opening an old version always flows through review, **Replace workflow**, and an
+explicit write. Plug never commits to your repository.
 
 ## Adapt your own HTTP API
 
 Copy `examples/your-http-api/input.json`, change both system descriptions and the
 connection's explicit mappings, input/output contract, profile and exact keys to
-match your service. Earlier `0.1-alpha.2` documents are migrated automatically. The source must accept POST JSON and return
-`{snapshotAt, version, data}`. Snapshot time is Unix epoch milliseconds; `data` must
-match the declared output schema. Local bindings use trusted loopback HTTP only.
+match your service. Earlier `0.1-alpha.2` documents are migrated automatically.
+The bundled envelope adapter accepts POST JSON and returns
+`{snapshotAt, version, data}`. A declared `RequestBinding` and `ResponseBinding`
+can instead map a plain REST API; local non-loopback execution requires explicit
+origin authorization, credentials stay in environment variables, and returned data
+must match the declared output schema.
 
 ```sh
 npx plug analyze input.json --out report
 npx plug explain input.json
 npx plug demo input.json --endpoint http://127.0.0.1:4010/inventory
+npx plug probe inventory --workspace .
+npx plug verify primary --mode as-is --workspace .
 ```
 
 With several connections, pass `--connection ID` to choose the one whose runner

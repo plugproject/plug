@@ -17,8 +17,19 @@ export type JsonValue =
 export type JsonObject = { [key: string]: JsonValue };
 /** Each operational fact carries provenance; unknown values must be null. */
 export interface Evidence {
-  /** `static` facts are parsed from local code, configuration or contract files. */
-  kind: 'declared' | 'observed' | 'synthetic' | 'static' | 'unknown';
+  /** `static` facts are parsed from local code, configuration or contract files.
+   * `probed` facts were measured by a bounded, author-authorized local probe;
+   * they describe that workbench vantage and are never production verification.
+   * `judged` facts are model judgments pinned to their exact inputs; they
+   * qualify a verdict and are never production verification. */
+  kind:
+    | 'declared'
+    | 'observed'
+    | 'synthetic'
+    | 'static'
+    | 'probed'
+    | 'unknown'
+    | 'judged';
   note: string;
   measuredAt?: string;
   sampleSize?: Quantity;
@@ -66,6 +77,27 @@ export interface Interaction {
   streaming: 'none' | 'server' | 'bidi' | 'unknown';
   cancellation: boolean | null;
 }
+/** A bounded request recipe. Header values may reference `${env:NAME}` and
+ * those environment values are resolved only at execution time. */
+export interface RequestBinding {
+  protocol: Interface['protocol'];
+  method: string;
+  pathTemplate: string;
+  query: { [key: string]: string };
+  headers: { [key: string]: string };
+  bodyTemplate: JsonValue | null;
+  samples: JsonObject[];
+  samplesEvidence: Evidence;
+}
+/** How a response is projected into the data and source-time used by a runner.
+ * JSON pointers are RFC 6901 pointers; null leaves that field unavailable. */
+export interface ResponseBinding {
+  dataPointer: string | null;
+  snapshotPointer: string | null;
+  snapshotHeader: string | null;
+  timestampFormat:
+    'iso-8601' | 'epoch-milliseconds' | 'epoch-seconds' | 'unknown';
+}
 export interface Operation {
   id: string;
   interfaceId: string;
@@ -74,6 +106,7 @@ export interface Operation {
   outputSchema: JsonObject | null;
   semantics: Semantics;
   interaction?: Interaction;
+  binding?: { request: RequestBinding; response: ResponseBinding };
   metadata?: JsonObject;
 }
 /** Delivery behavior of the channel through which this system is reached. `none` means synchronous request-reply. */
@@ -93,7 +126,7 @@ export interface SystemDescription {
   name: string;
   role: string;
   interfaces: Interface[];
-  /** Up to four selected operations per system. @maxItems 4 @minItems 1 */
+  /** Operations this system exposes or calls. @minItems 1 */
   operations: Operation[];
   /** Identity/trust domain; differing domains cross a trust boundary. */
   trustDomain?: string | null;
@@ -203,6 +236,23 @@ export interface FieldMapping {
   from: string;
   to: string;
 }
+/** A recorded judgment that the declared output meaning satisfies the required
+ * useful output. It binds to the exact judged strings: when either changes,
+ * the judgment is void and the strict comparison applies again. */
+export interface SemanticEquivalence {
+  equivalent: boolean | null;
+  outputMeaning: string;
+  usefulOutput: string;
+  evidence: Evidence;
+}
+/** An architecture choice explicitly adopted by the author. The engine
+ * re-verifies the pattern set against every new input and catalog version. */
+export interface AdoptedArchitecture {
+  architectureId: string;
+  patterns: string[];
+  catalogVersion: string;
+  evidence: Evidence;
+}
 /** One caller-to-downstream connection with its own facts and goal. */
 export interface Connection {
   id: string;
@@ -217,12 +267,14 @@ export interface Connection {
   workload: Workload;
   experience: Experience;
   remainingPath: RemainingPath;
+  semanticEquivalence?: SemanticEquivalence | null;
+  adoptedArchitecture?: AdoptedArchitecture | null;
 }
 export interface DesignInput {
   formatVersion: FormatVersion;
-  /** Two to eight systems. @minItems 2 @maxItems 8 */
+  /** At least two systems. @minItems 2 */
   systems: SystemDescription[];
-  /** One to twelve connections; operations may take part in several. @minItems 1 @maxItems 12 */
+  /** Connections may share systems and operations. @minItems 1 */
   connections: Connection[];
   /** Shared by every connection. */
   infrastructure: Infrastructure;
@@ -427,6 +479,8 @@ export interface ArchitectureCandidate {
   diagram: string;
   tasks: string[];
   executableHere: boolean;
+  /** `planned` comes from bounded composition; `adopted` was checked on demand. */
+  origin?: 'planned' | 'adopted';
 }
 export interface ConnectionReport {
   connectionId: string;
@@ -436,6 +490,17 @@ export interface ConnectionReport {
   patterns: PatternEvaluation[];
   architectures: ArchitectureCandidate[];
   selectedArchitectureId: string | null;
+  /** Author-adopted design when it remains valid under this exact analysis. */
+  adoptedArchitectureId?: string | null;
+  adoption?: {
+    status:
+      | 'honored'
+      | 'dominated'
+      | 'not_feasible'
+      | 'unknown_architecture'
+      | 'catalog_changed';
+    reason: string;
+  };
   /** Two or more feasible frontier architectures tie on every declared priority. */
   policyDecisionNeeded: boolean;
   priorities: Priority[];
@@ -462,11 +527,11 @@ export interface WorkflowSpecMetadata {
     inputHash: string;
     designHash: string;
     catalogVersion: string;
-    /** @maxItems 12 */
     selected: {
       connectionId: string;
       patternId: PatternId | null;
       architectureId: string | null;
+      adoptedArchitectureId?: string | null;
     }[];
   } | null;
 }
@@ -518,6 +583,93 @@ export interface SourceResponse {
   snapshotAt: Quantity;
   version: Quantity;
   data: JsonObject;
+}
+/** A host the author added to the local workbench. The value is an origin
+ * (`scheme://host[:port]`), never a URL containing credentials or a path. */
+export interface AuthorizedHost {
+  host: string;
+  addedAt: string;
+  addedVia: 'ui' | 'mcp' | 'cli';
+}
+/** One append-only event from a bounded local integration probe. */
+export interface ProbeEvent {
+  formatVersion: FormatVersion;
+  systemId: string;
+  operationId: string;
+  at: string;
+  type:
+    'plan' | 'request-start' | 'response' | 'rate-limit' | 'error' | 'complete';
+  attempt?: Quantity;
+  durationMs?: Quantity;
+  status?: Quantity;
+  bytes?: Quantity;
+  headers?: { [key: string]: string };
+  sample?: JsonValue;
+  message: string;
+}
+/** Bounded measurements for one operation from one local-workbench vantage. */
+export interface OperationManifest {
+  formatVersion: FormatVersion;
+  manifestHash: string;
+  systemId: string;
+  operationId: string;
+  endpoint: string;
+  measuredAt: string;
+  windowMs: Quantity;
+  sampleSize: Quantity;
+  vantage: {
+    kind: 'local-workbench';
+    nodeVersion: string;
+  };
+  latencyMs: {
+    p50: Quantity | null;
+    p90: Quantity | null;
+    p95: Quantity | null;
+    max: Quantity | null;
+  };
+  availability: Fraction | null;
+  responseBytes: Quantity | null;
+  statusHistogram: { [status: string]: Quantity };
+  rateLimitHeaders: { [key: string]: string };
+  cacheHeaders: { [key: string]: string };
+  timestampCandidates: string[];
+  sourceTimestamp: {
+    pointer: string;
+    format: ResponseBinding['timestampFormat'];
+    probability: Fraction;
+    model: string;
+  } | null;
+  usefulOutput: { probability: Fraction; model: string } | null;
+  changeIntervalMs: Quantity | null;
+  stoppedByRateLimit: boolean;
+}
+/** A bounded workbench demonstration pinned to an exact spec and design. */
+export interface VerificationRecord {
+  formatVersion: FormatVersion;
+  connectionId: string;
+  mode: 'as-is' | 'design';
+  verdict: 'demonstrated' | 'not_demonstrated' | 'inconclusive';
+  inputHash: string;
+  designHash: string;
+  revisionId: string | null;
+  architectureId: string | null;
+  measuredAt: string;
+  windowMs: Quantity;
+  sampleSize: Quantity;
+  vantage: 'local-workbench';
+  requirement: {
+    usefulOutput: string;
+    latencyTargetMs: Quantity;
+    scope: Experience['scope'];
+    targetPercentile: Fraction;
+  };
+  result: {
+    withinTarget: Fraction | null;
+    latencyP95Ms: Quantity | null;
+    usefulOutputProbability: Fraction | null;
+    judgeModel: string | null;
+  };
+  evidence: Evidence;
 }
 export interface WorkspaceFinding {
   kind:

@@ -36,6 +36,7 @@ beforeEach(async () => {
     workspaceDir: workspace,
     uiDir: ui,
     fixtureLatencyMs: 50,
+    bodyLimitBytes: 512 * 1024,
   });
 });
 afterEach(async () => {
@@ -121,9 +122,213 @@ describe('local workbench server', () => {
     const big = await fetch(`${server.url}/api/analyze`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: 'x'.repeat(300 * 1024),
+      body: 'x'.repeat(600 * 1024),
     });
     expect(big.status).toBe(413);
+  });
+  it('judges equivalence with the configured stub and logs the verdict locally', async () => {
+    const before = process.env.PLUG_JUDGE_PROVIDER;
+    process.env.PLUG_JUDGE_PROVIDER = 'stub';
+    try {
+      const r = await fetch(`${server.url}/api/judge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          outputMeaning: 'indicative flight options',
+          usefulOutput: 'the flight options, indicative',
+        }),
+      });
+      expect(r.status).toBe(200);
+      expect(await r.json()).toMatchObject({
+        question: 'output-equivalence',
+        questionVersion: 1,
+        model: 'stub',
+        equivalent: true,
+      });
+      const log = readFileSync(
+        join(workspace, '.plug', 'judgments.jsonl'),
+        'utf8',
+      )
+        .trim()
+        .split('\n');
+      expect(log).toHaveLength(1);
+      expect(JSON.parse(log[0])).toMatchObject({
+        model: 'stub',
+        equivalent: true,
+        usefulOutput: 'the flight options, indicative',
+      });
+      // Simple requests cannot carry JSON; a judge call needs the preflight.
+      const wrongType = await fetch(`${server.url}/api/judge`, {
+        method: 'POST',
+        body: 'text',
+      });
+      expect(wrongType.status).toBe(415);
+      const extra = await fetch(`${server.url}/api/judge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ outputMeaning: 'a', usefulOutput: 'b', x: 1 }),
+      });
+      expect(extra.status).toBe(400);
+    } finally {
+      if (before === undefined) delete process.env.PLUG_JUDGE_PROVIDER;
+      else process.env.PLUG_JUDGE_PROVIDER = before;
+    }
+  });
+  it('fails closed with guidance when no judge is configured', async () => {
+    const saved = {
+      PLUG_JUDGE_PROVIDER: process.env.PLUG_JUDGE_PROVIDER,
+      TYPESAFE_API_KEY: process.env.TYPESAFE_API_KEY,
+      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    };
+    for (const key of Object.keys(saved)) delete process.env[key];
+    try {
+      const r = await fetch(`${server.url}/api/judge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ outputMeaning: 'a', usefulOutput: 'b' }),
+      });
+      expect(r.status).toBe(503);
+      expect((await r.json()).error).toContain('No judge is configured');
+      expect(existsSync(join(workspace, '.plug', 'judgments.jsonl'))).toBe(
+        false,
+      );
+    } finally {
+      for (const [key, value] of Object.entries(saved))
+        if (value !== undefined) process.env[key] = value;
+    }
+  });
+  it('drafts quote-backed facts with the explicit stub and logs proposals', async () => {
+    const saved = {
+      PLUG_DRAFT_PROVIDER: process.env.PLUG_DRAFT_PROVIDER,
+      TYPESAFE_API_KEY: process.env.TYPESAFE_API_KEY,
+      PLUG_JUDGE_MODEL: process.env.PLUG_JUDGE_MODEL,
+    };
+    process.env.PLUG_DRAFT_PROVIDER = 'stub';
+    delete process.env.TYPESAFE_API_KEY;
+    delete process.env.PLUG_JUDGE_MODEL;
+    const body = {
+      version: 1,
+      target: {
+        connectionId: 'search',
+        callerSystemId: 'agent',
+        callerOperationId: 'find',
+        downstreamSystemId: 'aggregator',
+        downstreamOperationId: 'search',
+      },
+      requested: ['output-meaning'],
+      basis: {
+        sources: [
+          {
+            id: 'downstream-operation-description',
+            label: 'Downstream operation description',
+            text: 'Returns indicative flight options.',
+          },
+        ],
+        contracts: {
+          callerInput: null,
+          callerOutput: null,
+          downstreamInput: null,
+          downstreamOutput: null,
+        },
+      },
+    };
+    try {
+      const response = await fetch(`${server.url}/api/draft`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        version: 1,
+        model: 'stub-drafter',
+        proposals: [
+          {
+            kind: 'output-meaning',
+            value: 'Returns indicative flight options.',
+          },
+        ],
+      });
+      const log = readFileSync(join(workspace, '.plug', 'drafts.jsonl'), 'utf8')
+        .trim()
+        .split('\n');
+      expect(log).toHaveLength(1);
+      expect(JSON.parse(log[0])).toMatchObject({
+        model: 'stub-drafter',
+        requested: ['output-meaning'],
+      });
+      expect(
+        (
+          await fetch(`${server.url}/api/draft`, {
+            method: 'POST',
+            body: 'text',
+          })
+        ).status,
+      ).toBe(415);
+      expect(
+        (
+          await fetch(`${server.url}/api/draft`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...body, extra: true }),
+          })
+        ).status,
+      ).toBe(400);
+    } finally {
+      for (const key of Object.keys(saved)) delete process.env[key];
+      for (const [key, value] of Object.entries(saved))
+        if (value !== undefined) process.env[key] = value;
+    }
+  });
+  it('fails closed with guidance when no fact drafter is configured', async () => {
+    const saved = {
+      PLUG_DRAFT_PROVIDER: process.env.PLUG_DRAFT_PROVIDER,
+      PLUG_DRAFT_MODEL: process.env.PLUG_DRAFT_MODEL,
+      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    };
+    for (const key of Object.keys(saved)) delete process.env[key];
+    try {
+      const response = await fetch(`${server.url}/api/draft`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          version: 1,
+          target: {
+            connectionId: 'search',
+            callerSystemId: 'agent',
+            callerOperationId: 'find',
+            downstreamSystemId: 'aggregator',
+            downstreamOperationId: 'search',
+          },
+          requested: ['output-meaning'],
+          basis: {
+            sources: [
+              {
+                id: 'downstream-operation-description',
+                label: 'Downstream operation description',
+                text: 'Returns flight options.',
+              },
+            ],
+            contracts: {
+              callerInput: null,
+              callerOutput: null,
+              downstreamInput: null,
+              downstreamOutput: null,
+            },
+          },
+        }),
+      });
+      expect(response.status).toBe(503);
+      expect((await response.json()).error).toContain(
+        'No drafter is configured',
+      );
+      expect(existsSync(join(workspace, '.plug', 'drafts.jsonl'))).toBe(false);
+    } finally {
+      for (const [key, value] of Object.entries(saved))
+        if (value !== undefined) process.env[key] = value;
+    }
   });
   it('indexes the selected workspace and reports freshness', async () => {
     const before = await (await fetch(`${server.url}/api/workspace`)).json();
@@ -173,6 +378,8 @@ describe('local workbench server', () => {
       'design-input.json',
       'design.json',
       'design.md',
+      'revisions',
+      'revisions.jsonl',
       'workflow.yaml',
     ]);
     expect(readFileSync(join(dir, 'AGENTS.md'), 'utf8')).toContain(
@@ -260,6 +467,81 @@ describe('local workbench server', () => {
       expect(mcp.requests.some((r) => r.rpc === 'tools/call')).toBe(false);
     } finally {
       await mcp.close();
+    }
+  });
+  it('pins reviews, adopts with evidence, and exposes revision restore reads', async () => {
+    const before = process.env.PLUG_REVIEW_PROVIDER;
+    process.env.PLUG_REVIEW_PROVIDER = 'stub';
+    try {
+      const input = flightInput();
+      const written = await (
+        await fetch(`${server.url}/api/workspace/spec`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ input }),
+        })
+      ).json();
+      expect(written.revisionId).toMatch(/^[a-f0-9]{64}$/);
+      const revisions = await fetch(
+        `${server.url}/api/workspace/spec/revisions`,
+      ).then((response) => response.json());
+      expect(revisions.revisions[0].id).toBe(written.revisionId);
+      const historical = await fetch(
+        `${server.url}/api/workspace/spec?revision=${written.revisionId}`,
+      ).then((response) => response.json());
+      expect(historical.workflow).toContain('dsl: 1.0.3');
+
+      const reviewedResponse = await fetch(`${server.url}/api/review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          input,
+          connectionId: 'primary',
+          operationalContext: 'Use only the deterministic frontier.',
+          specRevision: written.revisionId,
+        }),
+      });
+      expect(reviewedResponse.status).toBe(200);
+      const reviewed = await reviewedResponse.json();
+      expect(reviewed.pinnedToRevision).toBe(true);
+      expect(reviewed.decision.adoptable).toContain('scheduled-cache');
+
+      const adoptedResponse = await fetch(`${server.url}/api/adopt`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          input,
+          connectionId: 'primary',
+          architectureId: 'scheduled-cache',
+          patterns: ['scheduled-cache'],
+          reviewHash: reviewed.reviewHash,
+        }),
+      });
+      expect(adoptedResponse.status).toBe(200);
+      const adopted = await adoptedResponse.json();
+      expect(adopted.design.connections[0].adoption.status).toBe('honored');
+      expect(
+        adopted.input.connections[0].adoptedArchitecture.evidence.note,
+      ).toContain('Adopted by the author');
+
+      const authorizedOnly = await fetch(`${server.url}/api/probe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          input,
+          systemId: 'aggregator',
+          authorize: true,
+          inspect: false,
+        }),
+      });
+      expect(authorizedOnly.status).toBe(200);
+      expect(await authorizedOnly.json()).toMatchObject({
+        authorized: true,
+        inspected: false,
+      });
+    } finally {
+      if (before === undefined) delete process.env.PLUG_REVIEW_PROVIDER;
+      else process.env.PLUG_REVIEW_PROVIDER = before;
     }
   });
   it('allows one bundled sandbox with token-bound actions', async () => {

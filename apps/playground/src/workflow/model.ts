@@ -6,7 +6,6 @@ import type {
   Operation,
   SystemDescription,
 } from '../../../../packages/plug/src/contracts/index';
-export const limits = { systems: 8, connections: 12, operations: 4 };
 /** What the inspector edits: one connection (edge), operation (node) or system (group). */
 export type Focus =
   | { kind: 'connection'; id: string }
@@ -45,6 +44,35 @@ export const blankOperation = (id: string, interfaceId: string): Operation => ({
       kind: 'unknown',
       note: 'Added in the playground; supply its facts.',
     },
+  },
+});
+/** A complete, inert binding for the inspector to fill without inventing values. */
+export const blankBinding = (
+  protocol: SystemDescription['interfaces'][number]['protocol'],
+): NonNullable<Operation['binding']> => ({
+  request: {
+    protocol,
+    method:
+      protocol === 'http'
+        ? 'GET'
+        : protocol === 'mcp'
+          ? 'tools/call'
+          : 'message/send',
+    pathTemplate: '',
+    query: {},
+    headers: {},
+    bodyTemplate: null,
+    samples: [],
+    samplesEvidence: {
+      kind: 'unknown',
+      note: 'No request samples supplied.',
+    },
+  },
+  response: {
+    dataPointer: null,
+    snapshotPointer: null,
+    snapshotHeader: null,
+    timestampFormat: 'unknown',
   },
 });
 export const blankSystem = (id: string): SystemDescription => ({
@@ -113,8 +141,6 @@ export function connectBlocked(
 ): string | null {
   if (from.systemId === to.systemId)
     return 'A connection joins two different systems.';
-  if (d.connections.length >= limits.connections)
-    return 'Twelve connections is the alpha limit.';
   if (
     pairTaken(d, from.systemId, from.operationId, to.systemId, to.operationId)
   )
@@ -281,8 +307,6 @@ export function renameOperation(
 /** Adds a blank operation to the system and returns its generated ID. */
 export function addOperation(d: DesignInput, systemId: string): string {
   const system = d.systems.find((s) => s.id === systemId)!;
-  if (system.operations.length >= limits.operations)
-    throw new Error('Four operations per system is the alpha limit.');
   const id = uniqueId(
     'operation',
     system.operations.map((o) => o.id),
@@ -318,13 +342,8 @@ export function moveBlocked(
   const source = d.systems.find((s) => s.id === from.systemId)!;
   if (toSystemId === from.systemId)
     return `It already belongs to ${source.name}.`;
-  if (toSystemId === null)
-    return d.systems.length >= limits.systems
-      ? 'Eight systems is the alpha limit.'
-      : null;
+  if (toSystemId === null) return null;
   const target = d.systems.find((s) => s.id === toSystemId)!;
-  if (target.operations.length >= limits.operations)
-    return 'Four operations per system is the alpha limit.';
   const joins = d.connections.some(
     (c) =>
       (c.callerSystemId === from.systemId &&
@@ -440,8 +459,6 @@ export function setOperations(
   operations: Operation[],
 ): string[] {
   const system = d.systems.find((s) => s.id === systemId)!;
-  if (operations.length > limits.operations)
-    throw new Error('Four operations per system is the alpha limit.');
   const ids = new Set(operations.map((o) => o.id));
   if (ids.size < operations.length)
     throw new Error('Operation IDs within a system must differ.');

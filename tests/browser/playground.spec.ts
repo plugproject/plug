@@ -7,6 +7,11 @@ import {
   startMcpFixture,
   startRoutes,
 } from '../fixtures/discovery-servers';
+import {
+  flightInput,
+  keys,
+  synthetic,
+} from '../../packages/plug/src/demo/flight';
 const operationNode = (page: Page, id: string) =>
   page.locator('.react-flow__node', {
     has: page.getByRole('button', { name: `Operation ${id}`, exact: true }),
@@ -15,6 +20,20 @@ const systemGroup = (page: Page, name: string) =>
   page.locator('.react-flow__node', {
     has: page.getByRole('button', { name: `System ${name}`, exact: true }),
   });
+const systemCount = (page: Page, value: number) =>
+  page.getByText(new RegExp(`^${value} systems? ·`));
+const connectionCount = (page: Page, value: number) =>
+  page.getByText(new RegExp(`· ${value} connections?$`));
+async function addWithoutInspection(page: Page) {
+  const disclosure = page.getByRole('dialog', {
+    name: 'Add integration host?',
+  });
+  await expect(disclosure).toBeVisible();
+  await disclosure
+    .getByRole('button', { name: 'Add without inspecting' })
+    .click();
+  await expect(disclosure).toHaveCount(0);
+}
 /** The box of `locator` once a new layout and fitting the view have stopped moving it. */
 async function settledBox(locator: Locator) {
   let seen: string[] = [];
@@ -214,7 +233,7 @@ test('multi-system intake, per-connection goals, priorities and frontier proofs'
   const frontier = page.getByRole('list', { name: 'Architecture frontier' });
   await expect(frontier).toContainText('scheduled-cache');
   await expect(frontier.locator('.architecture-row.selected')).toContainText(
-    'Selected',
+    'Engine selected',
   );
   await frontier.getByText('Proof').first().click();
   await expect(frontier).toContainText('Because');
@@ -223,7 +242,7 @@ test('multi-system intake, per-connection goals, priorities and frontier proofs'
     page.getByRole('list', { name: 'Priority order' }),
   ).toContainText(/Latency.*Simplicity.*Availability/);
   await page.getByRole('button', { name: '+ Add system' }).click();
-  await expect(page.getByText('3 of 8 systems')).toBeVisible();
+  await expect(systemCount(page, 3)).toBeVisible();
   await expect(page.getByLabel('System name')).toHaveValue('New system');
   await page.getByRole('button', { name: '+ Add connection' }).click();
   await page
@@ -315,7 +334,9 @@ test('metadata review and canonical validation work without runtime script evalu
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
-  await page.getByText('Import MCP / A2A metadata', { exact: true }).click();
+  await page
+    .getByText('Import MCP / A2A / OpenAPI metadata', { exact: true })
+    .click();
   await page.getByLabel('Pasted metadata').fill(
     JSON.stringify({
       serverId: 'own-mcp',
@@ -360,19 +381,19 @@ test('workflow canvas: drag to connect, delete by keyboard and OpenSpec round tr
   await page.getByRole('button', { name: '+ Add system' }).click();
   await expect(operationNode(page, 'operation')).toBeVisible();
   await drag(page, 'find-options', 'operation');
-  await expect(page.getByText('2 of 12 connections')).toBeVisible();
+  await expect(connectionCount(page, 2)).toBeVisible();
   await expect(page.getByLabel('Downstream system')).toHaveValue('system');
   await expect(page.getByLabel('Source latency (ms)')).toHaveValue('');
   // Edges never join operations of one system or repeat a pair.
   await drag(page, 'find-options', 'operation');
-  await expect(page.getByText('2 of 12 connections')).toBeVisible();
+  await expect(connectionCount(page, 2)).toBeVisible();
   await page
     .getByRole('button', { name: 'Connection connection', exact: true })
     .focus();
   await page.keyboard.press('Delete');
-  await expect(page.getByText('1 of 12 connections')).toBeVisible();
+  await expect(connectionCount(page, 1)).toBeVisible();
   await drag(page, 'find-options', 'operation');
-  await expect(page.getByText('2 of 12 connections')).toBeVisible();
+  await expect(connectionCount(page, 2)).toBeVisible();
   await page
     .getByRole('button', { name: 'Connection primary', exact: true })
     .click();
@@ -539,13 +560,13 @@ test('on-canvas buttons add and remove elements; an edge drop spawns a system', 
     .getByRole('menu', { name: 'Connect operation to' })
     .getByRole('menuitem', { name: '→ Slow flight aggregator · search' })
     .click();
-  await expect(page.getByText('2 of 12 connections')).toBeVisible();
+  await expect(connectionCount(page, 2)).toBeVisible();
   await expect(page.getByLabel('Source latency (ms)')).toHaveValue('');
   // × on the edge badge removes it.
   await page
     .getByRole('button', { name: 'Remove connection connection', exact: true })
     .click();
-  await expect(page.getByText('1 of 12 connections')).toBeVisible();
+  await expect(connectionCount(page, 1)).toBeVisible();
   // × removes the operation; nothing in use is protected from removal.
   await page
     .getByRole('button', { name: 'Remove operation operation', exact: true })
@@ -566,8 +587,8 @@ test('on-canvas buttons add and remove elements; an edge drop spawns a system', 
   await page.mouse.down();
   await page.mouse.move(bare.x, bare.y, { steps: 12 });
   await page.mouse.up();
-  await expect(page.getByText('3 of 8 systems')).toBeVisible();
-  await expect(page.getByText('2 of 12 connections')).toBeVisible();
+  await expect(systemCount(page, 3)).toBeVisible();
+  await expect(connectionCount(page, 2)).toBeVisible();
   await expect(page.getByRole('tab', { name: /^connection/ })).toContainText(
     'Flight-search agent → New system',
   );
@@ -595,7 +616,7 @@ test('operations move between systems, into new ones, and refused moves say why'
   );
   const bare = await emptySpot(page);
   await page.mouse.dblclick(bare.x, bare.y);
-  await expect(page.getByText('3 of 8 systems')).toBeVisible();
+  await expect(systemCount(page, 3)).toBeVisible();
   // Dropping on another system moves the operation, renamed where its ID is taken.
   await dragNode(
     page,
@@ -614,7 +635,7 @@ test('operations move between systems, into new ones, and refused moves say why'
       'Release to give search a new system.',
     ),
   );
-  await expect(page.getByText('4 of 8 systems')).toBeVisible();
+  await expect(systemCount(page, 4)).toBeVisible();
   await expect(systemGroup(page, 'Slow flight aggregator')).toContainText(
     'No operations yet.',
   );
@@ -622,7 +643,7 @@ test('operations move between systems, into new ones, and refused moves say why'
     'Give Slow flight aggregator an operation, or remove it.',
   );
   await page.getByRole('button', { name: 'Undo' }).click();
-  await expect(page.getByText('3 of 8 systems')).toBeVisible();
+  await expect(systemCount(page, 3)).toBeVisible();
   await expect(page.locator('.draft-gaps')).toHaveCount(0);
   // A connected operation cannot join the system at its other end.
   await page
@@ -631,7 +652,7 @@ test('operations move between systems, into new ones, and refused moves say why'
   await page
     .getByRole('menuitem', { name: '→ Slow flight aggregator · search' })
     .click();
-  await expect(page.getByText('2 of 12 connections')).toBeVisible();
+  await expect(connectionCount(page, 2)).toBeVisible();
   await dragNode(
     page,
     operationNode(page, 'operation-2'),
@@ -647,7 +668,7 @@ test('operations move between systems, into new ones, and refused moves say why'
       'Release to give operation-2 a new system.',
     ),
   );
-  await expect(page.getByText('4 of 8 systems')).toBeVisible();
+  await expect(systemCount(page, 4)).toBeVisible();
   await expect(page.getByRole('tab', { name: /^connection/ })).toContainText(
     'New system → Slow flight aggregator',
   );
@@ -670,7 +691,7 @@ test('operations move between systems, into new ones, and refused moves say why'
     'On Flight-search agent',
   );
   await expect(page.locator('#inspector-move')).toHaveCount(0);
-  await expect(page.getByText('2 of 12 connections')).toBeVisible();
+  await expect(connectionCount(page, 2)).toBeVisible();
   await expect(page.locator('.draft-gaps')).toContainText(
     'Give New system an operation, or remove it.',
   );
@@ -734,7 +755,7 @@ test('menus create at any level, and one operation fans out to many', async ({
     pane.getByRole('menuitem', { name: 'Add system' }),
   ).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(page.getByText('3 of 8 systems')).toBeVisible();
+  await expect(systemCount(page, 3)).toBeVisible();
   await page
     .getByRole('button', { name: 'System New system', exact: true })
     .click({ button: 'right' });
@@ -753,7 +774,7 @@ test('menus create at any level, and one operation fans out to many', async ({
     await page
       .getByRole('menuitem', { name: `→ New system · ${target}`, exact: true })
       .click();
-    await expect(page.getByText(`${count} of 12 connections`)).toBeVisible();
+    await expect(connectionCount(page, count)).toBeVisible();
   }
   await expect(operationNode(page, 'find-options')).toContainText('3 links');
   // Taken pairs drop out of the list; the reverse direction remains.
@@ -833,7 +854,7 @@ test('fullscreen editing with undo and redo, and Escape returns', async ({
   await expect(page.getByRole('button', { name: 'Undo' })).toBeDisabled();
   const bare = await emptySpot(page);
   await page.mouse.dblclick(bare.x, bare.y);
-  await expect(page.getByText('3 of 8 systems')).toBeVisible();
+  await expect(systemCount(page, 3)).toBeVisible();
   await page.getByLabel('System name').fill('Seat map');
   await expect(
     page.getByRole('button', { name: 'System Seat map', exact: true }),
@@ -844,9 +865,9 @@ test('fullscreen editing with undo and redo, and Escape returns', async ({
     page.getByRole('button', { name: 'System New system', exact: true }),
   ).toBeVisible();
   await page.keyboard.press('ControlOrMeta+z');
-  await expect(page.getByText('2 of 8 systems')).toBeVisible();
+  await expect(systemCount(page, 2)).toBeVisible();
   await page.keyboard.press('ControlOrMeta+Shift+z');
-  await expect(page.getByText('3 of 8 systems')).toBeVisible();
+  await expect(systemCount(page, 3)).toBeVisible();
   await page.getByRole('button', { name: 'Redo' }).click();
   await expect(
     page.getByRole('button', { name: 'System Seat map', exact: true }),
@@ -878,7 +899,7 @@ test('anything can be removed; a draft lists what it lacks until it is complete'
     .getByRole('button', { name: 'Remove operation search', exact: true })
     .click();
   await expect(operationNode(page, 'search')).toHaveCount(0);
-  await expect(page.getByText('0 of 12 connections')).toBeVisible();
+  await expect(connectionCount(page, 0)).toBeVisible();
   await expect(page.locator('.wf-hint')).toHaveText(
     'Removed operation search and its 1 connection. Undo restores it.',
   );
@@ -903,24 +924,24 @@ test('anything can be removed; a draft lists what it lacks until it is complete'
     page.getByRole('button', { name: '↓ Download OpenSpec' }),
   ).toBeDisabled();
   await page.getByRole('button', { name: 'Undo' }).click();
-  await expect(page.getByText('1 of 12 connections')).toBeVisible();
+  await expect(connectionCount(page, 1)).toBeVisible();
   await expect(gaps).toHaveCount(0);
   await expect(suggest).toBeEnabled();
   // The last connection, and then every system, can go as well.
   await page
     .getByRole('button', { name: 'Remove connection primary', exact: true })
     .click();
-  await expect(page.getByText('0 of 12 connections')).toBeVisible();
+  await expect(connectionCount(page, 0)).toBeVisible();
   for (const name of ['Slow flight aggregator', 'Flight-search agent'])
     await page
       .getByRole('button', { name: `Remove system ${name}`, exact: true })
       .click();
-  await expect(page.getByText('0 of 8 systems')).toBeVisible();
+  await expect(systemCount(page, 0)).toBeVisible();
   await expect(page.locator('.wf-empty')).toBeVisible();
   await expect(gaps).toContainText('Add at least two systems.');
   const bare = await emptySpot(page);
   await page.mouse.dblclick(bare.x, bare.y);
-  await expect(page.getByText('1 of 8 systems')).toBeVisible();
+  await expect(systemCount(page, 1)).toBeVisible();
   expect(errors).toEqual([]);
 });
 test('Add connection joins two clicked operations; a + shows on hover and Escape cancels', async ({
@@ -971,7 +992,7 @@ test('Add connection joins two clicked operations; a + shows on hover and Escape
     .getByRole('button', { name: 'Operation operation', exact: true })
     .click();
   await expect(add).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByText('2 of 12 connections')).toBeVisible();
+  await expect(connectionCount(page, 2)).toBeVisible();
   await expect(page.getByRole('tab', { name: /^connection/ })).toContainText(
     'Flight-search agent → New system',
   );
@@ -986,7 +1007,7 @@ test('Add connection joins two clicked operations; a + shows on hover and Escape
   await page
     .getByRole('button', { name: 'Operation search', exact: true })
     .click();
-  await expect(page.getByText('3 of 12 connections')).toBeVisible();
+  await expect(connectionCount(page, 3)).toBeVisible();
   await expect(page.getByRole('tab', { name: /^connection-2/ })).toContainText(
     'Slow flight aggregator → New system',
   );
@@ -1036,6 +1057,93 @@ test('MCP and A2A systems take server details; the hosted playground never conta
   expect(discoveries).toEqual([]);
   expect(errors).toEqual([]);
 });
+test('the inspector declares workload, path, trust, channel and mapping facts', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const inspector = page.locator('#inspector');
+  const json = page.getByLabel('Design input');
+  // Connection facts: workload, downstream profile and the caller path.
+  await inspector.getByLabel('Requests / minute', { exact: true }).fill('120');
+  await expect(json).toHaveValue(/"requestsPerMinute": \{\s*"value": 120/);
+  await inspector
+    .getByLabel('Availability (0–1)', { exact: true })
+    .fill('0.999');
+  await expect(json).toHaveValue(/"availability": \{\s*"value": 0\.999/);
+  await inspector.getByLabel('Final deadline (ms)').fill('8000');
+  await expect(json).toHaveValue(/"finalDeadlineMs": 8000/);
+  await inspector.getByLabel('Network (ms)').fill('40');
+  await expect(json).toHaveValue(/"networkMs": \{\s*"value": 40/);
+  await inspector
+    .getByLabel('Source timestamp')
+    .selectOption('responseSnapshot');
+  await expect(json).toHaveValue(/"sourceTimestamp": "responseSnapshot"/);
+  // Mappings cover the structured contracts row by row.
+  await inspector.getByRole('button', { name: '+ Add input mapping' }).click();
+  const rows = inspector.locator('.mapping-editor').first().locator('li');
+  const added = rows.nth((await rows.count()) - 1);
+  await added.getByLabel(/from$/).fill('origin');
+  await added.getByLabel(/to$/).fill('query');
+  await expect(json).toHaveValue(/"from": "origin",\s*"to": "query"/);
+  // Shared infrastructure numbers.
+  await inspector.getByLabel('Cache capacity (entries)').fill('50000');
+  await expect(json).toHaveValue(/"cacheCapacity": 50000/);
+  // System facts: trust domain, channel semantics, and an OpenAPI panel.
+  await page
+    .getByRole('button', { name: 'System Slow flight aggregator', exact: true })
+    .click();
+  await inspector.getByLabel('Trust domain').fill('vendor');
+  await expect(json).toHaveValue(/"trustDomain": "vendor"/);
+  await expect(
+    inspector.getByRole('region', { name: 'OpenAPI service' }),
+  ).toContainText('Discovery runs in the local workbench');
+  await inspector.getByLabel('Delivery').selectOption('at-least-once');
+  await inspector.getByLabel('Channel ordering').selectOption('key');
+  await expect(json).toHaveValue(/"delivery": "at-least-once"/);
+  await expect(json).toHaveValue(/"ordering": "key"/);
+  // Operation semantics the relation facts need.
+  await operationNode(page, 'search').click();
+  await inspector.getByLabel('Output meaning').fill('Fare snapshot');
+  await expect(json).toHaveValue(/"outputMeaning": "Fare snapshot"/);
+  await inspector.getByLabel('Sharing scope').selectOption('tenant');
+  await expect(json).toHaveValue(/"scope": "tenant"/);
+  await inspector.getByLabel('Accepts idempotency key').selectOption('true');
+  await expect(json).toHaveValue(/"idempotencyKeySupported": true/);
+  await inspector
+    .getByLabel('Key dimensions · comma separated')
+    .fill('origin, destination');
+  await expect(json).toHaveValue(
+    /"keyDimensions": \[\s*"origin",\s*"destination"\s*\]/,
+  );
+});
+test('an edge lists the facts it still needs; judgment points to the workbench', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const inspector = page.locator('#inspector');
+  const needed = inspector.getByRole('list', { name: 'Facts still needed' });
+  await expect(
+    needed.getByText('Availability target', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    needed.getByText('Downstream availability', { exact: true }),
+  ).toBeVisible();
+  // Declaring the fact clears its entry; nothing is ever filled in for you.
+  await inspector.getByLabel('Availability target (0–1)').fill('0.999');
+  await expect(
+    needed.getByText('Availability target', { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    needed.getByText('Downstream availability', { exact: true }),
+  ).toBeVisible();
+  // Differing semantic texts: the hosted playground never judges them itself.
+  await inspector
+    .getByLabel('Useful initial output')
+    .fill('indicative fare options');
+  await expect(inspector.locator('.judge-row')).toContainText(
+    'Judgment runs in the local workbench',
+  );
+});
 test.describe('local workbench', () => {
   test.use({ baseURL: process.env.PLUG_WORKBENCH_URL });
   test('writes the spec bundle for the IDE and reopens agent edits', async ({
@@ -1070,7 +1178,120 @@ test.describe('local workbench', () => {
     await expect(page.getByLabel('Latency target (ms)')).toHaveValue('2500');
     await page.screenshot({ path: 'test-results/plug-workbench.png' });
   });
-  test('lists an MCP server’s tools and an A2A agent’s skills, keeping no headers', async ({
+  test('reviews, adopts, and clears an engine-admissible architecture', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await page
+      .getByRole('button', { name: 'Suggest design', exact: true })
+      .click();
+    const review = page.getByRole('region', { name: 'Design review' });
+    await review
+      .getByRole('button', { name: 'Review selected designs' })
+      .click();
+    await expect(review).toContainText('Critic stub-reviewer');
+    const adopt = review.getByRole('button', { name: /^Adopt / }).first();
+    await expect(adopt).toBeVisible();
+    await adopt.click();
+    await expect(page.getByText(/Author adoption: honored\./)).toBeVisible();
+    await page.getByRole('button', { name: 'Clear adoption' }).click();
+    await expect(page.getByText(/Author adoption:/)).toHaveCount(0);
+    await expect(
+      page.getByText(
+        'Cleared the author adoption and restored the engine selection.',
+      ),
+    ).toBeVisible();
+  });
+  test('restores a retained spec through review, replace, and write', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Write spec to workspace' }).click();
+    await page.getByLabel('Latency target (ms)').fill('1777');
+    await page.getByRole('button', { name: 'Write spec to workspace' }).click();
+    const history = page.locator('.spec-history');
+    await history.getByText('Spec history').click();
+    const revisions = history.locator('h3', { hasText: 'Plug revisions' });
+    await expect(revisions).toBeVisible();
+    const revisionButtons = history.locator('ul').first().getByRole('button');
+    expect(await revisionButtons.count()).toBeGreaterThanOrEqual(2);
+    await revisionButtons.last().click();
+    const review = page.getByRole('region', { name: 'Workflow import review' });
+    await expect(review).toContainText('Plug revision');
+    await review.getByRole('button', { name: 'Replace workflow' }).click();
+    await expect(page.getByLabel('Latency target (ms)')).toHaveValue('2000');
+    await page.getByRole('button', { name: 'Write spec to workspace' }).click();
+    await expect(page.getByText(/Wrote .plug\/workflow.yaml/)).toBeVisible();
+  });
+  test('verifies an authorized plain-REST edge from the workbench', async ({
+    page,
+  }) => {
+    const api = await startRoutes({
+      '/offers': {
+        json: {
+          capturedAt: new Date().toISOString(),
+          payload: {
+            offers: [{ id: 'fare-1', price: 125, currency: 'USD' }],
+          },
+        },
+      },
+    });
+    try {
+      const input = flightInput();
+      input.systems[1].interfaces[0].endpoint = api.origin;
+      input.systems[1].operations[0].binding = {
+        request: {
+          protocol: 'http',
+          method: 'GET',
+          pathTemplate: '/offers',
+          query: { origin: '{origin}' },
+          headers: {},
+          bodyTemplate: null,
+          samples: keys,
+          samplesEvidence: synthetic,
+        },
+        response: {
+          dataPointer: '/payload',
+          snapshotPointer: '/capturedAt',
+          snapshotHeader: null,
+          timestampFormat: 'iso-8601',
+        },
+      };
+      const authorized = await page.request.post(
+        `${process.env.PLUG_WORKBENCH_URL}/api/probe`,
+        {
+          data: {
+            input,
+            systemId: 'aggregator',
+            authorize: true,
+            inspect: false,
+          },
+        },
+      );
+      expect(authorized.ok()).toBe(true);
+      await page.goto('/');
+      await page.getByText('Advanced input · JSON / YAML').click();
+      await page.getByLabel('Design input').fill(JSON.stringify(input));
+      await page.getByRole('button', { name: 'Apply document' }).click();
+      await page
+        .getByRole('button', { name: 'Suggest design', exact: true })
+        .click();
+      await page.getByRole('button', { name: 'Verify as-is' }).click();
+      const demonstration = page
+        .getByText('Demonstration', { exact: true })
+        .locator('..');
+      await expect(demonstration).not.toContainText('Not run');
+      await expect(demonstration).toContainText(
+        'Workbench vantage only; this is not a production SLO.',
+      );
+      expect(
+        api.requests.filter((request) => request.method === 'GET'),
+      ).toHaveLength(3);
+    } finally {
+      await api.close();
+    }
+  });
+  test('lists MCP tools and A2A skills without keeping discovery headers', async ({
     page,
   }) => {
     const mcp = await startMcpFixture({
@@ -1106,9 +1327,11 @@ test.describe('local workbench', () => {
     });
     try {
       await page.goto('/');
+      await expect(page.locator('#workspace')).toBeVisible();
       const inspector = page.locator('#inspector');
       const json = page.getByLabel('Design input');
       await page.getByRole('button', { name: '+ Add system' }).click();
+      await addWithoutInspection(page);
       await inspector.getByLabel('Protocol').selectOption('mcp');
       const server = inspector.getByRole('region', { name: 'MCP server' });
       await server
@@ -1126,22 +1349,29 @@ test.describe('local workbench', () => {
       const tools = server.getByRole('group', {
         name: 'Fares MCP · MCP 2025-11-25 · 10 tools',
       });
+      await expect(tools).toContainText('9 chosen');
       await expect(
         tools.getByRole('checkbox', { name: /^no_schema/ }),
       ).toBeDisabled();
       const filter = tools.getByLabel('Filter tools');
       await filter.fill('tool_2');
       await expect(tools.getByRole('checkbox')).toHaveCount(1);
-      await tools.getByRole('checkbox', { name: /^tool_2 / }).check();
+      await expect(
+        tools.getByRole('checkbox', { name: /^tool_2 / }),
+      ).toBeChecked();
       await filter.fill('');
-      await tools.getByRole('checkbox', { name: /^tool_5 / }).check();
+      await expect(
+        tools.getByRole('checkbox', { name: /^tool_5 / }),
+      ).toBeChecked();
       await expect(tools).toContainText('Applying removes operation.');
       await tools.getByRole('button', { name: 'Apply to New system' }).click();
+      await addWithoutInspection(page);
       await expect(server.getByRole('status')).toContainText(
-        'Fares MCP now has 2 tools from the server.',
+        'Fares MCP now has 9 tools from the server.',
       );
       await expect(operationNode(page, 'tool_2')).toBeVisible();
       await expect(operationNode(page, 'tool_5')).toBeVisible();
+      await expect(operationNode(page, 'tool_9')).toBeVisible();
       await expect(operationNode(page, 'operation')).toHaveCount(0);
       // Plug lists tools and never calls one; the query is used, not kept.
       const rpcs = mcp.requests.flatMap((r) => (r.rpc ? [r.rpc] : []));
@@ -1154,6 +1384,7 @@ test.describe('local workbench', () => {
       await expect(json).not.toHaveValue(/Bearer e2e|tenant=e2e/);
       // An A2A agent's skills come from its public Agent Card.
       await page.getByRole('button', { name: '+ Add system' }).click();
+      await addWithoutInspection(page);
       await inspector.getByLabel('Protocol').selectOption('a2a');
       const card = inspector.getByRole('region', { name: 'A2A agent' });
       await card.getByLabel('Agent URL or Agent Card URL').fill(agent.origin);
@@ -1168,6 +1399,7 @@ test.describe('local workbench', () => {
         skills.getByRole('checkbox', { name: /^rebook/ }),
       ).toBeChecked();
       await skills.getByRole('button', { name: 'Apply to New system' }).click();
+      await addWithoutInspection(page);
       await expect(operationNode(page, 'rebook')).toBeVisible();
       await expect(
         page.getByRole('button', { name: 'System Travel agent', exact: true }),
@@ -1176,5 +1408,284 @@ test.describe('local workbench', () => {
     } finally {
       await Promise.all([mcp.close(), agent.close()]);
     }
+  });
+  test('lists an OpenAPI service and inspects only its authorized safe read', async ({
+    page,
+  }) => {
+    const api = await startRoutes({
+      '/openapi.json': {
+        require: ['Authorization', 'Bearer api'],
+        json: {
+          openapi: '3.1.0',
+          info: { title: 'Inventory API', version: '1.0.0' },
+          components: {
+            securitySchemes: {
+              ApiKey: {
+                type: 'apiKey',
+                in: 'header',
+                name: 'X-Api-Key',
+              },
+            },
+          },
+          security: [{ ApiKey: [] }],
+          paths: {
+            '/availability/{sku}': {
+              get: {
+                operationId: 'check-availability',
+                summary: 'Availability snapshot',
+                parameters: [
+                  {
+                    name: 'sku',
+                    in: 'path',
+                    required: true,
+                    schema: { type: 'string', enum: ['SKU-1'] },
+                  },
+                ],
+                responses: {
+                  '200': {
+                    content: {
+                      'application/json': {
+                        schema: {
+                          type: 'object',
+                          properties: { available: { type: 'integer' } },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            '/reservations': {
+              post: {
+                operationId: 'reserve-stock',
+                parameters: [
+                  {
+                    name: 'Idempotency-Key',
+                    in: 'header',
+                    required: true,
+                    schema: { type: 'string' },
+                  },
+                ],
+                responses: { '201': { description: 'created' } },
+              },
+            },
+          },
+        },
+      },
+      '/availability/SKU-1': {
+        json: { available: 7 },
+      },
+    });
+    try {
+      await page.goto('/');
+      const inspector = page.locator('#inspector');
+      const json = page.getByLabel('Design input');
+      await page.getByRole('button', { name: '+ Add system' }).click();
+      await addWithoutInspection(page);
+      // A new system exposes HTTP, so the OpenAPI panel is already there, and
+      // indexing comes first: the fresh system starts at its document URL.
+      const server = inspector.getByRole('region', { name: 'OpenAPI service' });
+      const url = server.getByLabel('OpenAPI document URL');
+      await expect(url).toBeFocused();
+      await url.fill(`${api.url}/openapi.json?draft=1`);
+      await url.press('Enter');
+      await expect(server.getByRole('alert')).toContainText(
+        'refused the request (HTTP 401)',
+      );
+      await server
+        .getByLabel(/^Request headers/)
+        .fill('Authorization: Bearer api');
+      await server.getByRole('button', { name: 'Discover operations' }).click();
+      const ops = server.getByRole('group', {
+        name: 'Inventory API · OpenAPI 3.1.0 · 2 operations',
+      });
+      await expect(ops).toContainText(/Listed in \d+ ms by this workbench/);
+      await expect(
+        ops.getByRole('checkbox', { name: /^check-availability/ }),
+      ).toBeChecked();
+      await expect(ops).toContainText('GET /availability/{sku}');
+      await ops.getByRole('checkbox', { name: /^reserve-stock/ }).check();
+      await ops.getByRole('button', { name: 'Apply to New system' }).click();
+      const disclosure = page.getByRole('dialog', {
+        name: 'Add integration host?',
+      });
+      await expect(operationNode(page, 'check-availability')).toHaveCount(0);
+      await disclosure.getByRole('button', { name: 'Add and inspect' }).click();
+      await expect(disclosure).toHaveCount(0);
+      await expect(server.getByRole('status')).toContainText(
+        'Inventory API now has 2 operations from the server.',
+      );
+      await expect(operationNode(page, 'check-availability')).toBeVisible();
+      await expect(operationNode(page, 'reserve-stock')).toBeVisible();
+      await page
+        .getByRole('button', {
+          name: 'Operation check-availability',
+          exact: true,
+        })
+        .click();
+      await expect(inspector.getByLabel('Method')).toHaveValue('GET');
+      await expect(inspector.getByLabel('Path template')).toHaveValue(
+        '/availability/{sku}',
+      );
+      await expect(inspector.getByLabel('Header template JSON')).toHaveValue(
+        /\$\{env:X_API_KEY\}/,
+      );
+      await inspector
+        .getByLabel('Header template JSON')
+        .fill('{"Authorization":"Bearer leaked"}');
+      await inspector
+        .getByRole('button', { name: /Apply header template JSON/i })
+        .click();
+      await expect(inspector.getByRole('alert')).toContainText(
+        'save an environment reference',
+      );
+      await expect(json).not.toHaveValue(/Bearer leaked/);
+      await expect(inspector.getByLabel('Response data pointer')).toHaveValue(
+        'root',
+      );
+      // The endpoint defaults to the document origin; the method and path
+      // stay with each operation; discovery credentials and URL query are never kept.
+      await expect(json).toHaveValue(
+        new RegExp(`"endpoint": "${api.origin.replaceAll('.', '\\.')}/"`),
+      );
+      await expect(json).toHaveValue(/"idempotencyKeySupported": true/);
+      await expect(json).toHaveValue(/"path": "\/reservations"/);
+      await expect(json).not.toHaveValue(/Bearer api|draft=1/);
+      await expect(
+        page
+          .getByRole('region', { name: 'Probe manifest' })
+          .getByText(/samples · \d+ ms window/),
+      ).toBeVisible();
+      expect(
+        api.requests.filter((request) =>
+          request.path.startsWith('/availability/SKU-1'),
+        ),
+      ).toHaveLength(3);
+      expect(
+        api.requests.filter((request) =>
+          request.path.startsWith('/reservations'),
+        ),
+      ).toHaveLength(0);
+    } finally {
+      await api.close();
+    }
+  });
+  test('judges differing texts with the configured stub and pins the verdict', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const inspector = page.locator('#inspector');
+    const json = page.getByLabel('Design input');
+    const row = inspector.locator('.judge-row');
+    // Same tokens, different phrasing: the strict comparison alone fails.
+    await inspector
+      .getByLabel('Useful initial output')
+      .fill('the flight options, indicative');
+    await expect(row).toContainText('strict comparison fails');
+    await row.getByRole('button', { name: 'Judge equivalence' }).click();
+    await expect(row).toContainText('Judged equivalent');
+    await expect(row).toContainText('stub:');
+    await expect(json).toHaveValue(/"semanticEquivalence": \{/);
+    await expect(json).toHaveValue(/"kind": "judged"/);
+    // The verdict is pinned to its exact strings: editing one voids it.
+    await inspector.getByLabel('Useful initial output').fill('fare options');
+    await expect(row).toContainText('no longer applies');
+    await row.getByRole('button', { name: 'Clear judgment' }).click();
+    await expect(json).not.toHaveValue(/semanticEquivalence/);
+    await expect(row).toContainText('strict comparison fails');
+  });
+  test('drafts missing facts for review and adopts only on author action', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const json = page.getByLabel('Design input');
+    await page
+      .getByRole('button', { name: 'Operation search', exact: true })
+      .click();
+    await page.getByLabel('Output meaning').fill('');
+    await page
+      .getByRole('button', { name: 'Connection primary', exact: true })
+      .click();
+    const needed = page
+      .locator('#inspector')
+      .getByRole('list', { name: 'Facts still needed' });
+    await expect(
+      needed.getByText('Downstream output meaning', { exact: true }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Draft missing facts' }).click();
+    const proposals = page.getByRole('region', {
+      name: 'Draft fact proposals',
+    });
+    await expect(proposals).toContainText('stub-drafter');
+    await expect(proposals).toContainText('Read a timestamped fare snapshot');
+    // Drafting is review-only: the canonical input is still unknown.
+    await expect(json).toHaveValue(/"outputMeaning": null/);
+    await proposals
+      .getByRole('button', {
+        name: 'Adopt Downstream output meaning',
+      })
+      .click();
+    await expect(json).toHaveValue(
+      /"outputMeaning": "Read a timestamped fare snapshot"/,
+    );
+    await expect(json).toHaveValue(/"type": "model-draft"/);
+    await expect(json).toHaveValue(
+      /Supporting quote.*Read a timestamped fare snapshot/,
+    );
+    await expect(json).toHaveValue(/Jev cross-check was not configured/);
+    await expect(
+      needed.getByText('Downstream output meaning', { exact: true }),
+    ).toHaveCount(0);
+    // Adoption uses the normal editor transaction and is undoable.
+    await page.getByRole('button', { name: 'Undo' }).click();
+    await expect(json).toHaveValue(/"outputMeaning": null/);
+  });
+
+  test('large workflow keeps fifty operations and one hundred searchable connections', async ({
+    page,
+  }) => {
+    const input = flightInput();
+    const caller = input.systems[0].operations[0];
+    const downstream = input.systems[1].operations[0];
+    input.systems[0].operations = Array.from({ length: 25 }, (_, index) => ({
+      ...structuredClone(caller),
+      id: `caller-${index + 1}`,
+    }));
+    input.systems[1].operations = Array.from({ length: 25 }, (_, index) => ({
+      ...structuredClone(downstream),
+      id: `downstream-${index + 1}`,
+    }));
+    const template = input.connections[0];
+    input.connections = Array.from({ length: 100 }, (_, index) => {
+      const callerIndex = index % 25;
+      const downstreamIndex = Math.floor(index / 25);
+      return {
+        ...structuredClone(template),
+        id: `edge-${index + 1}`,
+        callerOperationId: `caller-${callerIndex + 1}`,
+        downstreamOperationId: `downstream-${downstreamIndex + 1}`,
+        profile: {
+          ...structuredClone(template.profile),
+          operationId: `downstream-${downstreamIndex + 1}`,
+        },
+      };
+    });
+    await page.goto('/');
+    await page.getByText('Advanced input · JSON / YAML').click();
+    await page.getByLabel('Design input').fill(JSON.stringify(input));
+    const started = Date.now();
+    await page.getByRole('button', { name: 'Apply document' }).click();
+    await expect(page.getByText('2 systems · 100 connections')).toBeVisible();
+    await expect(page.getByLabel('Find a connection')).toBeVisible();
+    await page.getByLabel('Find a connection').fill('edge-100');
+    await expect(page.getByRole('tab', { name: /edge-100/ })).toBeVisible();
+    await expect(page.locator('.react-flow__node-operation')).toHaveCount(50);
+    expect(Date.now() - started).toBeLessThan(10_000);
+    await page
+      .getByRole('button', { name: 'Suggest design', exact: true })
+      .click();
+    await expect(
+      page.getByText('Flight-search agent · 100', { exact: true }),
+    ).toBeVisible();
   });
 });

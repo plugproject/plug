@@ -12,7 +12,11 @@ required by this configuration. Owner budget authorization is needed for an
 always-on paid tier. Set APP_ORIGIN to the exact public HTTPS origin. Leave
 TRUST_PROXY_HOPS=0 until the platform's actual forwarding chain has been verified;
 configure the exact numeric hop count, never blanket trust. With zero hops, a
-shared proxy may cause conservative aggregate throttling.
+shared proxy may cause conservative aggregate throttling. The platform supplies
+PORT; the server otherwise defaults to 3000. Render supplies RENDER_GIT_COMMIT for
+`/healthz`; set RELEASE_COMMIT on another host when release metadata is available.
+Model-provider variables are unnecessary for the hosted playground, which never
+runs local judgment, drafting, review, probing or verification routes.
 
 Verify /healthz and its release commit, first NDJSON delivery, 15-second source
 warmup, valid fast hit, later scheduled refresh, changed version, failed refresh,

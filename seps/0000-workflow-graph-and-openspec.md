@@ -91,13 +91,13 @@ redone, and consecutive edits in one text field count as one change. Layout is
 computed from the input after every structural change, so dragged positions
 last until the next one; coordinates are never serialized.
 
-`DesignInput.systems` holds two to eight systems and `connections` one to
-twelve, so any caller operation may reach several downstream operations and any
-downstream operation may serve several callers. Each system still selects at
-most four operations, and each connection still selects a distinct operation
+`DesignInput.systems` holds at least two systems and `connections` at least one,
+so any caller operation may reach several downstream operations and any
+downstream operation may serve several callers. The serialized schema has no
+system, operation or connection count ceiling; document bytes and runtime
+resources remain bounded. Each connection still selects a distinct operation
 pair between distinct systems. The relation engine, planner and
-cross-connection checks are unchanged and remain linear in the number of
-connections.
+cross-connection checks are unchanged and scale with the number of connections.
 
 ### Open Workflow Specification interchange
 
@@ -130,9 +130,9 @@ connection. Every operational fact of a drafted connection is unknown; a task
 timeout is a declared hard bound; HTTP `GET` and `HEAD` are static read
 evidence. The placeholder experience, unmapped call types and unmodeled
 control flow (`switch`, `fork`, `for`, `try`, `listen`, `emit`, `run`,
-`set`, `wait`, `raise`) are listed as gaps. Documents beyond 256 KB, eight
-systems, twelve connections or four operations per system are rejected with
-counts.
+`set`, `wait`, `raise`) are listed as gaps. Local documents beyond 64 MB and
+hosted requests beyond 256 KB are rejected; no separate graph count limit is
+imposed.
 
 ### Workspace spec bundle
 
@@ -147,6 +147,11 @@ and write `<workspace>/.plug/`. Without an argument, `plug spec` re-applies
 - `design.md`, the explanation and implementation tasks;
 - `AGENTS.md`, a short guide telling coding agents what these files are, that
   they are regenerated, and how to update them.
+
+Later draft SEPs extend the owned directory with exact-origin authorizations,
+probe manifests/logs, verification and review JSONL, and at most 50
+content-addressed OpenSpec revisions. Those records preserve source, changed
+paths and local-workbench evidence; Plug never commits to the user's repository.
 
 Each file is written to a temporary sibling and renamed. Plug never edits the
 user's root `AGENTS.md` or other repository files. The workbench reads the bundle
@@ -169,10 +174,18 @@ server over stdio for one workspace. It never listens on a port. Tools:
   index;
 - `plug_explain` returns the explanation for the current bundle or one
   connection.
+- `plug_add_system` applies the host-inspection disclosure and optionally
+  probes safe reads;
+- `plug_probe` and `plug_verify_edge` collect bounded local-workbench evidence;
+- `plug_review_design` and `plug_adopt_design` separate model advice from the
+  author's explicit architecture pin;
+- `plug_list_spec_revisions` lists retained OpenSpec snapshots.
 
-The bundle files are also resources under `plug://spec/`. Every call reads the
-workspace again, so the agent sees edits made in the workbench. Tool arguments
-are limited to 256 KB and indexing honors cancellation.
+The bundle files are also resources under `plug://spec/`; probe and verification
+records are available under `plug://manifest` and `plug://verifications`. Every
+call reads the workspace again, so the agent sees edits made in the workbench.
+Tool arguments are limited to 64 MB and long operations honor cancellation and
+a 120-second bound.
 
 `plug mcp install [--ide cursor|vscode|claude|generic] [--workspace dir]`
 registers the server in project-scoped configuration only: `.cursor/mcp.json`,
@@ -194,9 +207,9 @@ server private to the IDE process that started it.
 
 ## Compatibility
 
-The format version stays `0.2-alpha.1`. Every valid document remains valid; only
-the upper bounds grow, so older readers may reject inputs with more than four
-systems or three connections. `WorkflowSpecMetadata` and `WorkflowTaskMetadata`
+The format version stays `0.2-alpha.1`. Every valid document remains valid; the
+former count ceilings are removed, so older readers may reject larger graphs.
+`WorkflowSpecMetadata` and `WorkflowTaskMetadata`
 are new public contracts. Hashes of existing inputs do not change. The
 workbench replaces the system cards and the per-connection experience form with
 the graph and its inspector; connection tabs, the advanced JSON editor and
@@ -219,7 +232,7 @@ metadata import remain.
 Workflow import is parse-only: no endpoint, Agent Card, MCP server or command in
 the document is fetched or run, and drafted systems keep host names or command
 base names only. Imports reuse the 256 KB, nesting, alias, tag and prototype
-guards. The bundle writer only writes inside `<workspace>/.plug/`. The MCP
+guards (64 MB locally; the hosted boundary remains 256 KB). The bundle writer only writes inside `<workspace>/.plug/`. The MCP
 server uses stdio, accepts bounded arguments, never invokes described endpoints
 and validates every update like any other input. `plug mcp install` writes
 only project-scoped configuration and never overwrites unparseable files.

@@ -12,7 +12,10 @@ provider selection and orchestration order alone cannot solve the gap.
 
 ## Specification
 
-Accept exactly two systems, explicit mappings, operational facts with evidence,
+The bootstrap `0.1-alpha.2` format accepted exactly two systems. The current
+`0.2-alpha.1` draft supersedes that intake with at least two systems and any
+number of connections and operations that fit the document and runtime resource
+bounds; it preserves the same explicit mappings, operational facts with evidence,
 and required useful output. Evaluate direct, cache-aside, scheduled refresh,
 progressive output and two bounded compositions. Format version is `0.1-alpha.2`.
 Preserve unknowns, source age, protocol direction and hard UX requirements.

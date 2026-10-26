@@ -3,6 +3,7 @@ import {
   assertContract,
   defaultPriorities,
   guardDocument,
+  localDocumentLimit,
   parseInput,
   validateInput,
 } from '../contracts/index';
@@ -19,13 +20,11 @@ import type {
   WorkflowSpecMetadata,
   WorkflowTaskMetadata,
 } from '../contracts/index';
+import { effectiveArchitectureId } from '../recommender/index';
 /** Open Workflow Specification DSL version written on export; any 1.x document is read. */
 export const workflowDsl = '1.0.3';
 export const workflowLimits = {
-  bytes: 256 * 1024,
-  systems: 8,
-  connections: 12,
-  operationsPerSystem: 4,
+  bytes: localDocumentLimit,
 };
 export interface WorkflowImport {
   input: DesignInput;
@@ -78,6 +77,15 @@ function taskFor(input: DesignInput, c: Connection): Task {
   const endpoint =
     iface.endpoint ??
     placeholder(c.downstreamSystemId, c.downstreamOperationId);
+  const http =
+    operation.metadata?.http &&
+    typeof operation.metadata.http === 'object' &&
+    !Array.isArray(operation.metadata.http)
+      ? (operation.metadata.http as Record<string, unknown>)
+      : {};
+  const declaredMethod =
+    typeof http.method === 'string' ? http.method.toLowerCase() : null;
+  const declaredPath = typeof http.path === 'string' ? http.path : null;
   const call: Task =
     iface.protocol === 'mcp'
       ? {
@@ -94,8 +102,13 @@ function taskFor(input: DesignInput, c: Connection): Task {
         : {
             call: 'http',
             with: {
-              method: operation.semantics.effect === 'read' ? 'get' : 'post',
-              endpoint,
+              method:
+                declaredMethod ??
+                (operation.semantics.effect === 'read' ? 'get' : 'post'),
+              endpoint:
+                iface.endpoint && declaredPath
+                  ? `${iface.endpoint.replace(/\/+$/, '')}/${declaredPath.replace(/^\/+/, '')}`
+                  : endpoint,
             },
           };
   const timeout = c.profile.timeoutMs.value;
@@ -139,7 +152,10 @@ export function exportWorkflowSpec(
       selected: design.connections.map((r) => ({
         connectionId: r.connectionId,
         patternId: r.selectedId,
-        architectureId: r.selectedArchitectureId,
+        architectureId: effectiveArchitectureId(r),
+        ...(r.adoption?.status === 'honored' && r.adoptedArchitectureId
+          ? { adoptedArchitectureId: r.adoptedArchitectureId }
+          : {}),
       })),
     },
   };
@@ -504,7 +520,7 @@ export function importWorkflowDocument(raw: unknown): WorkflowImport {
   if (
     new TextEncoder().encode(JSON.stringify(raw)).length > workflowLimits.bytes
   )
-    throw new Error('Workflow document exceeds 256 KB');
+    throw new Error('Workflow document exceeds 64 MB');
   const doc = object(raw, 'Workflow document');
   const head = object(doc.document, 'document');
   if (typeof head.dsl !== 'string' || !/^1\.\d+\.\d+/.test(head.dsl))
@@ -777,20 +793,6 @@ export function importWorkflowDocument(raw: unknown): WorkflowImport {
   if (!connections.length)
     throw new Error(
       'The workflow has no HTTP, OpenAPI, MCP or A2A call task to map',
-    );
-  const crowded = systems.find(
-    (s) => s.operations.length > workflowLimits.operationsPerSystem,
-  );
-  if (crowded)
-    throw new Error(
-      `${crowded.name} would select ${crowded.operations.length} operations; Plug supports four per system`,
-    );
-  if (
-    systems.length > workflowLimits.systems ||
-    connections.length > workflowLimits.connections
-  )
-    throw new Error(
-      `The workflow maps to ${systems.length} systems and ${connections.length} connections; Plug supports up to ${workflowLimits.systems} systems and ${workflowLimits.connections} connections`,
     );
   const input = validateInput({
     formatVersion: '0.2-alpha.1',

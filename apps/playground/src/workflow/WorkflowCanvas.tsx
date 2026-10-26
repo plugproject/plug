@@ -58,7 +58,6 @@ import {
   addOperation,
   connectBlocked,
   freePartnersFor,
-  limits,
   moveBlocked,
   moveOperation,
   reconnectBlocked,
@@ -710,14 +709,8 @@ function Canvas({
       ? `${s.name} (${s.id})`
       : s.name;
   };
-  const connectionLimit = () =>
-    input.connections.length >= limits.connections
-      ? 'Twelve connections is the alpha limit.'
-      : null;
-  const addOperationBlocked = (s: SystemDescription) =>
-    s.operations.length >= limits.operations
-      ? 'Four operations per system is the alpha limit.'
-      : null;
+  const connectionLimit = () => null;
+  const addOperationBlocked = (_s: SystemDescription) => null;
   const addOperationTo = (systemId: string) => {
     const s = input.systems.find((x) => x.id === systemId)!;
     const id = uniqueId(
@@ -857,11 +850,7 @@ function Canvas({
   const connectItems = (e: Endpoint, only?: 'calls' | 'serves'): MenuItem[] => {
     const { calls, serves } = freePartnersFor(input, e.systemId, e.operationId);
     const full = connectionLimit();
-    const spawn =
-      full ??
-      (input.systems.length >= limits.systems
-        ? 'Eight systems is the alpha limit.'
-        : null);
+    const spawn = full;
     const name = (p: Endpoint) =>
       `${systemLabel(p.systemId)} · ${p.operationId}`;
     const items: MenuItem[] = [];
@@ -904,10 +893,7 @@ function Canvas({
       return [
         {
           label: 'Add system',
-          blocked:
-            input.systems.length >= limits.systems
-              ? 'Eight systems is the alpha limit.'
-              : null,
+          blocked: null,
           run: onAddSystem,
         },
         linking

@@ -1,0 +1,161 @@
+---
+title: OpenSpec revision history and read-only Git restore
+status: draft
+---
+
+This proposal has no PR number, sponsor or approval. It proposes immutable local
+OpenSpec revisions and optional read-only project Git lookup. The bounded
+reference store and restore flow are implemented; the proposal remains draft
+pending owner review.
+
+## Motivation
+
+Probing may replace an existing fact, review may lead an author to adopt a
+different architecture, and agents may update the spec alongside code. The
+current bundle stores only the latest `workflow.yaml`, so recovery depends on
+whatever history happens to exist outside Plug. That is not enough for
+one-click restoration or for proving which spec revision a measurement, review
+or adoption used.
+
+Plug needs its own content-addressed history without becoming a source-control
+client. When project Git already contains older OpenSpec content, Plug should
+also be able to read and restore that content without staging, committing,
+checking out or otherwise mutating the repository.
+
+## Specification
+
+### Content-addressed OpenSpec revisions
+
+The revision ID is the lowercase SHA-256 digest of the exact generated
+`workflow.yaml` bytes. It is included in the bundle summary, generated guide,
+probe and verification records, design reviews, adoptions and MCP responses
+that depend on the spec.
+
+Every successful bundle write snapshots the exact workflow bytes under
+`.plug/revisions/<revisionId>.yaml` before publishing the new current bundle.
+A snapshot is immutable. Repeating identical content reuses its snapshot rather
+than rewriting it.
+
+`.plug/revisions.jsonl` is a bounded retained index. Each record contains at least
+the revision ID, time, input and design hashes, catalog version, write source,
+byte count and changed canonical paths. Rewriting identical content reuses its
+existing record and snapshot. Plug retains the 50 newest distinct revisions,
+atomically rewrites the index, and removes snapshots that leave that window.
+The UI labels the retention bound; project Git may provide older tracked content.
+
+Write sources include local UI, CLI, MCP, probe application and author adoption.
+Failed or partial writes create no current revision. Revision snapshot, index
+append and current-bundle publication participate in the bundle writer's
+serialized atomic write sequence.
+
+### Restore
+
+The history view shows immutable Plug revisions and, when available, project
+Git versions of `.plug/workflow.yaml`. Choosing **Restore** first loads the
+selected bytes, verifies their content hash where applicable, parses and guards
+the document, reconciles it into a canonical input, re-runs deterministic
+analysis and shows the resulting differences and gaps.
+
+The author then confirms one action to replace the current workflow. Restore
+uses the ordinary validated bundle writer and creates or reuses a retained revision
+record; it never mutates the selected snapshot. This is the
+one-click recovery path for a fact displaced by probing or a design changed by
+adoption.
+
+### Read-only project Git
+
+Git support is optional and read-only. Plug may locate the repository root,
+report whether `.plug/workflow.yaml` is tracked or ignored, list a bounded set
+of commits that changed that exact path, and read the file at a validated commit
+with `git show`.
+
+Git commands use argument arrays, `--` before paths, validated object IDs, a
+short deadline, cancellation, `GIT_TERMINAL_PROMPT=0` and
+`GIT_OPTIONAL_LOCKS=0`. Missing Git, a non-repository workspace, an untracked
+file or absent historical content yields an empty optional result rather than a
+write or setup flow.
+
+Plug never runs `git add`, `commit`, `checkout`, `restore`, `reset`, `revert`,
+`merge`, `tag`, `branch`, `push` or a command that changes configuration,
+index, refs or working-tree files. Restoring content read from Git writes only
+through Plug's own validated `.plug/` bundle flow. Plug never commits on the
+author's behalf and never creates a private repository under `.plug/`.
+
+## Rationale
+
+A hash of exact bytes makes revision identity deterministic and lets every
+downstream record state precisely which OpenSpec it used. Immutable snapshots
+within a documented 50-revision window preserve displaced values without requiring Git and
+without making retention depend on whether `.plug/` is tracked.
+
+Project Git remains useful as a second read source when teams already commit
+their spec. Restricting it to status, log and show avoids surprising repository
+mutations. Restore is intentionally a new Plug write, not a Git checkout, so
+validation and analysis cannot be bypassed.
+
+## Compatibility
+
+An existing bundle acquires its first Plug revision on its next successful
+write. Plug does not synthesize past history. Current bundle filenames and
+OpenSpec interchange remain unchanged; `revisionId` and history metadata are
+additive.
+
+Workspaces without Git behave normally. Ignored and untracked `.plug/` bundles
+still have Plug history. Consumers that do not understand revisions may read
+the current files as before. Retention is capped at 50 distinct revisions and
+history reads remain byte- and time-bounded.
+
+## Alternatives
+
+- Depend entirely on Git. Many `.plug/` directories are ignored or uncommitted,
+  and Plug still needs revision pins for probe and review records.
+- Keep every snapshot forever. Rejected because local state would grow without
+  bound; the explicit 50-revision window plus optional project Git is the chosen
+  recovery boundary.
+- Rewrite one mutable backup. It cannot represent branches of author decisions
+  or establish content identity.
+- Commit every update automatically. Source-control authorship and repository
+  policy belong to the user, not Plug.
+- Restore with `git checkout` or `git restore`. That can overwrite unrelated
+  work and bypass Plug's validation flow.
+
+## Security implications
+
+Revision paths are derived only from validated fixed-length hashes and stay
+under the resolved `.plug/revisions/` directory. Reads reject traversal,
+symbolic-link escapes, oversized files, malformed documents and hash mismatch.
+Revision content may contain private architecture facts and remains local.
+
+Git commands never invoke a shell, prompt for credentials or acquire optional
+repository locks. Commit identifiers and paths are separately validated. Output
+is byte- and time-bounded before parsing. The history UI renders diffs and
+messages as text.
+
+## Implementation
+
+`packages/plug/src/openspec/revisions.ts` implements hashing, changed paths,
+deduplication, the 50-record retention window and guarded snapshots.
+`packages/plug/src/workspace/git.ts` implements bounded `execFile`-only status,
+log and show. The bundle writer, local routes, MCP and workbench history panel
+provide the validated review/replace/write restore flow.
+
+## Validation
+
+The
+[OpenSpec tests](https://github.com/plugproject/plug/blob/main/tests/openspec.test.ts),
+[MCP tests](https://github.com/plugproject/plug/blob/main/tests/mcp-server.test.ts),
+[local server tests](https://github.com/plugproject/plug/blob/main/tests/ui-server.test.ts) and
+[browser suite](https://github.com/plugproject/plug/blob/main/tests/browser/playground.spec.ts) prove:
+
+- revision IDs equal the SHA-256 of exact workflow bytes;
+- snapshots are immutable, events append, duplicate content deduplicates safely
+  and failed writes leave no partial current state;
+- restore parses, guards, re-analyzes and creates a new event without deleting
+  history;
+- a probe overwrite and adoption can each be restored in one author action;
+- Git absence, ignored files and missing history fail closed without setup;
+- only the allowed read-only Git commands execute with time and byte bounds;
+- no Plug path stages, commits or mutates project Git; and
+- revision pins make stale probe, verification and review records detectable.
+
+This proposal remains draft pending owner review.

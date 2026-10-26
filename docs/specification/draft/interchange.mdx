@@ -32,9 +32,9 @@ byte-identical.
 ## Import
 
 Import parses only. It never fetches, resolves or calls an endpoint, Agent Card,
-MCP server or command in the document. Documents larger than 256 KB, or that would
-produce more than eight systems, twelve connections or four operations per system,
-are rejected with their counts.
+MCP server or command in the document. The local parser accepts up to 64 MB; the
+hosted request boundary remains 256 KB. There is no separate serialized count
+ceiling for systems, operations or connections.
 
 A document with valid `metadata.plug` is reconciled against its task list:
 connections keep their canonical facts, follow the task order and are removed when
@@ -52,13 +52,20 @@ and unmodeled control flow are reported as gaps for the author to resolve.
 
 `plug spec` and the local workbench write `<workspace>/.plug/`:
 
-| File                | Content                                   |
-| ------------------- | ----------------------------------------- |
-| `workflow.yaml`     | The exported workflow; the spec of record |
-| `design-input.json` | The canonical input                       |
-| `design.json`       | The `DesignRecommendation`                |
-| `design.md`         | Explanation and implementation tasks      |
-| `AGENTS.md`         | Guide for coding agents                   |
+| File                  | Content                                   |
+| --------------------- | ----------------------------------------- |
+| `workflow.yaml`       | The exported workflow; the spec of record |
+| `design-input.json`   | The canonical input                       |
+| `design.json`         | The `DesignRecommendation`                |
+| `design.md`           | Explanation and implementation tasks      |
+| `AGENTS.md`           | Guide for coding agents                   |
+| `hosts.json`          | Exact origins the author authorized       |
+| `manifest.json`       | Latest operation probe manifests          |
+| `probes/`             | Bounded per-operation observation logs    |
+| `verifications.jsonl` | Edge demonstrations                       |
+| `reviews.jsonl`       | Citation-gated design reviews             |
+| `revisions/`          | Content-addressed workflow snapshots      |
+| `revisions.jsonl`     | At most 50 retained revision records      |
 
 Each file is written to a temporary sibling and renamed. Plug never edits other
 repository files, including a root `AGENTS.md`. Readers must treat the bundle as
@@ -70,10 +77,20 @@ workflow as a download only and has no workspace endpoints.
 ## MCP server
 
 `plug mcp` serves one workspace over stdio and never listens on a port. Its tools
-are `plug_get_spec`, `plug_update_spec`, `plug_analyze`, `plug_index_workspace` and
-`plug_explain`; the bundle files are resources under `plug://spec/`. Updates go
-through the same validation, reconciliation and analysis as any other input.
-Arguments are limited to 256 KB, and every call reads the workspace again.
+are `plug_get_spec`, `plug_update_spec`, `plug_analyze`,
+`plug_index_workspace`, `plug_explain`, `plug_add_system`, `plug_probe`,
+`plug_verify_edge`, `plug_review_design`, `plug_adopt_design` and
+`plug_list_spec_revisions`. Bundle files are resources under `plug://spec/`;
+probe and verification state are `plug://manifest` and `plug://verifications`.
+Updates go through the same validation, reconciliation and analysis as any other
+input. Arguments are limited to 64 MB, long actions are cancellable and bounded at
+120 seconds, and every call reads the workspace again.
+
+Every successful bundle write snapshots `workflow.yaml` by content hash and appends
+a deduplicated revision record with source and changed paths. Plug retains at most
+50 records. The workbench and MCP can list or inspect a revision, but restoring one
+always flows through import review and an explicit replace/write action. Read-only
+Git history is shown when `.plug/workflow.yaml` is tracked; Plug never commits.
 
 `plug mcp install` writes a `plug` entry into project-scoped configuration only
 (`.cursor/mcp.json`, `.vscode/mcp.json` or `.mcp.json`), keeps every other entry

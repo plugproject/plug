@@ -1,0 +1,8 @@
+{
+  "id": "flight",
+  "input": "schema/draft/examples/DesignInput/flight.json",
+  "variant": "identity",
+  "operationalContext": "",
+  "expectedEngine": "scheduled-cache",
+  "expectedAdoptable": ["scheduled-cache"]
+}

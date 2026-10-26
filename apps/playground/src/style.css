@@ -1331,6 +1331,38 @@ details li {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
+.mapping-editor {
+  margin: 8px 0 0;
+  padding: 8px 10px 10px;
+  border: 1px solid #dde3d4;
+  border-radius: 8px;
+  background: #fff;
+  min-width: 0;
+}
+.mapping-editor legend {
+  padding: 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.mapping-rows {
+  display: grid;
+  gap: 4px;
+  margin: 4px 0 6px;
+  padding: 0;
+  list-style: none;
+}
+.mapping-rows li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+}
+.mapping-rows input {
+  min-width: 0;
+  padding: 6px 8px;
+  font-size: 12px;
+}
 .wf-edge .react-flow__edge-path {
   stroke: #9aa98a;
   stroke-width: 1.5;
@@ -1426,6 +1458,73 @@ details li {
 .inspector > button {
   margin-top: 14px;
   margin-right: 10px;
+}
+.facts-needed {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px dashed #c9d2bd;
+  border-radius: 6px;
+  background: #fdfef9;
+}
+.facts-needed h3 {
+  margin: 0 0 2px;
+}
+.facts-needed ul {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.facts-needed li {
+  font-size: 11px;
+  color: #4e5a45;
+  background: #eef2e4;
+  border: 1px solid #dde3d4;
+  border-radius: 10px;
+  padding: 1px 8px;
+}
+.fact-drafting {
+  margin-top: 10px;
+}
+.fact-drafting > button:not(.text-button) {
+  padding: 7px 10px;
+}
+.fact-proposals {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid #dde3d4;
+}
+.fact-proposal {
+  margin: 8px 0;
+  padding: 8px;
+  border: 1px solid #dde3d4;
+  border-radius: 6px;
+  background: #fff;
+}
+.fact-proposal h4 {
+  margin: 0 0 4px;
+  font-size: 12px;
+}
+.fact-proposal blockquote {
+  margin: 6px 0;
+  padding: 5px 8px;
+  border-left: 3px solid #c9d2bd;
+  color: #4e5a45;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.proposal-value {
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.inspector .fields .judge-row {
+  grid-column: 1 / -1;
+  margin: 2px 0 8px;
+}
+.judge-row button:not(.text-button) {
+  margin-top: 2px;
 }
 .link-list {
   padding-left: 16px;
@@ -1594,6 +1693,105 @@ html.wf-locked {
 .wf-full .wf-inspect-chip {
   display: none;
 }
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(20 24 20 / 58%);
+}
+.modal-card {
+  width: min(560px, 100%);
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper, #fff);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 30%);
+}
+.modal-card h2 {
+  margin-top: 0;
+}
+.modal-actions,
+.review-adoptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.connection-search {
+  display: grid;
+  max-width: 420px;
+  margin: 12px 0;
+}
+.design-groups {
+  display: grid;
+  gap: 8px;
+}
+.design-groups > details {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.verdict-comparison {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+.verdict-comparison article {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fafbf7;
+}
+.verdict-comparison strong {
+  font-size: 1.05rem;
+}
+.manifest-panel,
+.design-review,
+.spec-history {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fafbf7;
+}
+.manifest-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+}
+.manifest-grid article {
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: white;
+}
+.tag.conflict {
+  color: #813b00;
+  background: #fff1db;
+}
+.design-review textarea {
+  min-height: 90px;
+}
+.review-result small {
+  display: block;
+  margin-top: 4px;
+}
+.architecture-row .text-button {
+  margin-left: 8px;
+}
+.spec-history li {
+  margin: 6px 0;
+}
+.spec-history li small {
+  display: block;
+}
 @media (max-width: 800px) {
   .workflow-layout {
     grid-template-columns: 1fr;
@@ -1607,6 +1805,9 @@ html.wf-locked {
   .wf-full .workflow-layout {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1fr) minmax(0, 42%);
+  }
+  .verdict-comparison {
+    grid-template-columns: 1fr;
   }
 }
 @media (max-width: 650px) {

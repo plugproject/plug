@@ -90,6 +90,9 @@ describe('workspace indexer', () => {
     expect(get.semantics.effect).toBe('read');
     expect(get.semantics.cachePermission).toBeNull();
     expect(get.semantics.scope).toBe('unknown');
+    expect(get.metadata).toEqual({
+      http: { method: 'get', path: '/stock/{sku}' },
+    });
     expect(get.semantics.evidence).toMatchObject({
       kind: 'static',
       source: { type: 'openapi', location: 'openapi.yaml' },

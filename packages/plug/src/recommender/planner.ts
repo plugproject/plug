@@ -1,9 +1,11 @@
 import type {
+  AdoptedArchitecture,
   Applicability,
   ArchitectureCandidate,
   Candidate,
   CandidateStatus,
   Condition,
+  ConnectionReport,
   ObligationStatus,
   PatternDefinition,
   PatternEvaluation,
@@ -357,12 +359,359 @@ export function comparePriorities(
     }
   return 0;
 }
+
+export type ArchitectureVerificationVerdict =
+  'verified' | 'unknown_pattern' | 'conflict' | 'not_applicable' | 'unclosed';
+export interface ArchitectureVerification {
+  verdict: ArchitectureVerificationVerdict;
+  status: CandidateStatus | null;
+  reason: string;
+  candidate: ArchitectureCandidate | null;
+}
+
+const definitionOrder = new Map(knowledge.map((p, i) => [p.id, i]));
+const comparePatternIds = (a: string, b: string) =>
+  (definitionOrder.get(a) ?? Number.MAX_SAFE_INTEGER) -
+    (definitionOrder.get(b) ?? Number.MAX_SAFE_INTEGER) ||
+  (a < b ? -1 : a > b ? 1 : 0);
+const patternSetKey = (ids: string[]) =>
+  [...new Set(ids)].sort().join('\u0000');
+
+/**
+ * Produces one stable order for a pattern set. Introducers precede patterns
+ * that close their obligations; otherwise catalog order is authoritative.
+ */
+function canonicalAddOns(baseId: string, proposed: string[]) {
+  const ids = [...new Set(proposed.filter((id) => id !== baseId))];
+  const outgoing = new Map(ids.map((id) => [id, new Set<string>()]));
+  const incoming = new Map(ids.map((id) => [id, 0]));
+  for (const source of ids) {
+    const introduced =
+      knowledge.find((definition) => definition.id === source)?.introduces ??
+      [];
+    for (const target of ids) {
+      if (
+        source === target ||
+        !introduced.some((item) =>
+          knowledge
+            .find((definition) => definition.id === target)
+            ?.solves.includes(item),
+        ) ||
+        outgoing.get(source)!.has(target)
+      )
+        continue;
+      outgoing.get(source)!.add(target);
+      incoming.set(target, incoming.get(target)! + 1);
+    }
+  }
+  const available = ids
+    .filter((id) => incoming.get(id) === 0)
+    .sort(comparePatternIds);
+  const result: string[] = [];
+  while (available.length) {
+    const id = available.shift()!;
+    result.push(id);
+    for (const target of [...outgoing.get(id)!].sort(comparePatternIds)) {
+      incoming.set(target, incoming.get(target)! - 1);
+      if (incoming.get(target) === 0) {
+        available.push(target);
+        available.sort(comparePatternIds);
+      }
+    }
+  }
+  // Cycles fall back to catalog order; closure is checked independently below.
+  return [
+    ...result,
+    ...ids.filter((id) => !result.includes(id)).sort(comparePatternIds),
+  ];
+}
+
+const failedVerification = (
+  verdict: Exclude<ArchitectureVerificationVerdict, 'verified'>,
+  reason: string,
+  status: CandidateStatus | null = 'infeasible',
+): ArchitectureVerification => ({ verdict, status, reason, candidate: null });
+
+export function verifyArchitecture(
+  base: Candidate,
+  patterns: string[],
+  relation: RelationFacts,
+  firstResponseBudgetMs: number | null,
+): ArchitectureVerification;
+export function verifyArchitecture(
+  base: Candidate,
+  patterns: string[],
+  relation: RelationFacts,
+  priorities: Priority[],
+  firstResponseBudgetMs: number | null,
+): ArchitectureVerification;
+/**
+ * Deterministically checks one exact stack. This is check mode: it never
+ * searches for missing patterns and never invokes a model.
+ */
+export function verifyArchitecture(
+  base: Candidate,
+  proposedPatterns: string[],
+  relation: RelationFacts,
+  prioritiesOrBudget: Priority[] | number | null,
+  explicitBudget?: number | null,
+): ArchitectureVerification {
+  const firstResponseBudgetMs = Array.isArray(prioritiesOrBudget)
+    ? (explicitBudget ?? null)
+    : prioritiesOrBudget;
+  const baseDefinition = knowledge.find(
+    (definition) =>
+      definition.id === base.id && definition.template === base.id,
+  );
+  if (!baseDefinition)
+    return failedVerification(
+      'unknown_pattern',
+      `Unknown seed base ${base.id}.`,
+      null,
+    );
+  if (baseDefinition.scope !== 'pairwise')
+    return failedVerification(
+      'not_applicable',
+      `${base.id} needs global context and cannot be checked for one connection.`,
+    );
+
+  const unknown = [
+    ...new Set(
+      proposedPatterns.filter(
+        (id) => id !== base.id && !knowledge.some((p) => p.id === id),
+      ),
+    ),
+  ].sort();
+  if (unknown.length)
+    return failedVerification(
+      'unknown_pattern',
+      `Unknown architecture pattern${unknown.length === 1 ? '' : 's'}: ${unknown.join(', ')}.`,
+      null,
+    );
+
+  const canonicalPatterns = canonicalAddOns(base.id, proposedPatterns);
+  const definitions = canonicalPatterns.map((id) =>
+    knowledge.find((definition) => definition.id === id)!,
+  );
+  const extraBase = definitions.find(
+    (definition) => definition.template !== null,
+  );
+  if (extraBase)
+    return failedVerification(
+      'not_applicable',
+      `${extraBase.id} is a seed base, not a pairwise add-on; a stack must contain exactly one base.`,
+    );
+  const global = definitions.find(
+    (definition) => definition.scope !== 'pairwise',
+  );
+  if (global)
+    return failedVerification(
+      'not_applicable',
+      `${global.id} needs global context and cannot be checked for one connection.`,
+    );
+
+  const applicability = new Map(
+    definitions.map((definition) => [
+      definition.id,
+      evaluateOne(definition, relation),
+    ]),
+  );
+  const blocked = definitions.find((definition) =>
+    ['contraindicated', 'not_applicable', 'needs_global_context'].includes(
+      applicability.get(definition.id)!.applicability,
+    ),
+  );
+  if (blocked) {
+    const evaluation = applicability.get(blocked.id)!;
+    return failedVerification(
+      'not_applicable',
+      `${blocked.id} is ${evaluation.applicability}: ${evaluation.reason || 'not valid for these facts.'}`,
+    );
+  }
+
+  const selectedDefinitions = [baseDefinition, ...definitions];
+  for (let i = 0; i < selectedDefinitions.length; i++)
+    for (let j = i + 1; j < selectedDefinitions.length; j++) {
+      const a = selectedDefinitions[i],
+        b = selectedDefinitions[j];
+      const declaredBy = [
+        ...(a.conflicts.includes(b.id) ? [a.id] : []),
+        ...(b.conflicts.includes(a.id) ? [b.id] : []),
+      ];
+      if (declaredBy.length)
+        return failedVerification(
+          'conflict',
+          `${a.id} conflicts with ${b.id} (declared by ${declaredBy.join(', ')}).`,
+        );
+    }
+
+  const solverFor = (item: string) =>
+    selectedDefinitions.find((definition) => definition.solves.includes(item))
+      ?.id ?? null;
+  const baseAddresses = (problem: string) =>
+    baseSolves(base, problem, firstResponseBudgetMs) ||
+    baseDefinition.solves.includes(problem);
+  const present = problems.filter(
+    (problem) =>
+      holds(relation, { fact: problem.fact, is: problem.is }) === true,
+  );
+  const solvedHere = present.map((problem) => ({
+    id: problem.id,
+    solvedBy: baseAddresses(problem.id) ? base.id : solverFor(problem.id),
+  }));
+  const openProblems = solvedHere.filter((problem) => !problem.solvedBy);
+  if (openProblems.length)
+    return failedVerification(
+      'unclosed',
+      `Open problem${openProblems.length === 1 ? '' : 's'}: ${openProblems.map((problem) => problem.id).join(', ')}. Every present problem must be closed by the base or a selected pattern.`,
+    );
+
+  const introduced = [
+    ...new Set(definitions.flatMap((definition) => definition.introduces)),
+  ];
+  const obligationStatuses: ObligationStatus[] = [];
+  const unknownObligations: string[] = [];
+  for (const id of introduced) {
+    const definition = obligations.find((obligation) => obligation.id === id);
+    if (!definition) {
+      unknownObligations.push(id);
+      continue;
+    }
+    const coveredBy = solverFor(id);
+    const dischargedBy = definition.dischargedBy.find(
+      (condition) => holds(relation, condition) === true,
+    )?.fact;
+    obligationStatuses.push({
+      id,
+      coveredBy,
+      dischargedBy: coveredBy ? null : (dischargedBy ?? null),
+    });
+  }
+  const openObligations = obligationStatuses
+    .filter(
+      (obligation) =>
+        obligation.coveredBy === null && obligation.dischargedBy === null,
+    )
+    .map((obligation) => obligation.id);
+  const unclosedObligations = [
+    ...new Set([...unknownObligations, ...openObligations]),
+  ];
+  if (unclosedObligations.length)
+    return failedVerification(
+      'unclosed',
+      `Open obligation${unclosedObligations.length === 1 ? '' : 's'}: ${unclosedObligations.join(', ')}. Every introduced obligation must be covered or discharged.`,
+    );
+
+  const unknownPatterns = definitions.filter(
+    (definition) =>
+      applicability.get(definition.id)!.applicability === 'unknown',
+  );
+  const unknownProblems = problems.filter(
+    (problem) =>
+      holds(relation, { fact: problem.fact, is: problem.is }) === null &&
+      !baseAddresses(problem.id) &&
+      !solverFor(problem.id),
+  );
+  let status = base.status;
+  if (unknownPatterns.length || unknownProblems.length)
+    status = worst(status, 'conditional');
+  const baseUnknowns = base.criteria
+    .filter((criterion) => criterion.verdict === 'unknown')
+    .map((criterion) => `${criterion.id}: ${criterion.reason}`);
+  const candidate = architecture(base, canonicalPatterns, status, {
+    problems: solvedHere,
+    obligations: obligationStatuses,
+    because: [
+      ...solvedHere.map((problem) => {
+        const definition = problems.find((item) => item.id === problem.id)!;
+        return `${definition.description}: ${relation[definition.fact].reason} Addressed by ${problem.solvedBy}.`;
+      }),
+      ...obligationStatuses.map((obligation) =>
+        obligation.coveredBy
+          ? `Obligation ${obligation.id} covered by ${obligation.coveredBy}.`
+          : `Obligation ${obligation.id} discharged: ${relation[obligation.dischargedBy!].reason}`,
+      ),
+      ...base.criteria
+        .filter((criterion) => criterion.verdict === 'pass_under_assumptions')
+        .map(
+          (criterion) =>
+            `${criterion.id} passes under assumptions (${criterion.actual ?? '-'} vs ${criterion.required ?? '-'}).`,
+        ),
+    ],
+    rejected: [],
+    unknowns: [
+      ...baseUnknowns,
+      ...unknownProblems.map(
+        (problem) => `${problem.description}? ${relation[problem.fact].reason}`,
+      ),
+      ...unknownPatterns.map(
+        (definition) =>
+          `${definition.id}: ${applicability.get(definition.id)!.reason}`,
+      ),
+    ],
+  });
+  return {
+    verdict: 'verified',
+    status,
+    reason: `Architecture ${candidate.id} is closed and evaluates ${status.replaceAll('_', ' ')}.`,
+    candidate,
+  };
+}
+
+interface ArchitecturePlan {
+  patterns: PatternEvaluation[];
+  architectures: ArchitectureCandidate[];
+  selectedArchitectureId: string | null;
+  adoptedArchitectureId?: string;
+  adoption?: NonNullable<ConnectionReport['adoption']>;
+  policyDecisionNeeded: boolean;
+  unknownProblems: string[];
+}
+
+function resolveAdoptedStack(
+  adopted: AdoptedArchitecture,
+  candidates: Candidate[],
+): { base: Candidate; patterns: string[] } | { reason: string; unknown: true } {
+  const proposed = [...new Set(adopted.patterns)];
+  let baseIds = proposed
+    .filter(
+      (id) =>
+        knowledge.find((definition) => definition.id === id)?.template === id,
+    )
+    .sort(comparePatternIds);
+  if (!baseIds.length) {
+    const fromId = adopted.architectureId.split('+')[0];
+    if (
+      knowledge.find((definition) => definition.id === fromId)?.template ===
+      fromId
+    ) {
+      proposed.push(fromId);
+      baseIds = [fromId];
+    }
+  }
+  if (!baseIds.length)
+    return {
+      reason:
+        'The adopted pattern set does not identify a known seed architecture.',
+      unknown: true,
+    };
+  const base = candidates.find((candidate) => candidate.id === baseIds[0]);
+  if (!base)
+    return {
+      reason: `The adopted seed ${baseIds[0]} is not in the current catalog.`,
+      unknown: true,
+    };
+  return { base, patterns: proposed };
+}
+
 export function planArchitectures(
   candidates: Candidate[],
   relation: RelationFacts,
   priorities: Priority[],
   firstResponseBudgetMs: number | null,
-) {
+  adoptedArchitecture: AdoptedArchitecture | null = null,
+  currentCatalogVersion?: string,
+): ArchitecturePlan {
   const patterns = evaluatePatterns(
     relation,
     candidates,
@@ -500,6 +849,58 @@ export function planArchitectures(
       );
     }
   }
+  let adoption: ConnectionReport['adoption'];
+  let adoptedCandidate: ArchitectureCandidate | undefined;
+  let adoptedArchitectureId: string | undefined;
+  if (
+    adoptedArchitecture &&
+    currentCatalogVersion !== undefined &&
+    adoptedArchitecture.catalogVersion !== currentCatalogVersion
+  )
+    adoption = {
+      status: 'catalog_changed',
+      reason: `Adopted catalog ${adoptedArchitecture.catalogVersion} differs from current catalog ${currentCatalogVersion}; re-adopt after review.`,
+    };
+  else if (adoptedArchitecture) {
+    const resolved = resolveAdoptedStack(adoptedArchitecture, candidates);
+    if ('unknown' in resolved)
+      adoption = {
+        status: 'unknown_architecture',
+        reason: resolved.reason,
+      };
+    else {
+      const proposedKey = patternSetKey(resolved.patterns);
+      adoptedCandidate = architectures.find(
+        (candidate) => patternSetKey(candidate.patterns) === proposedKey,
+      );
+      if (!adoptedCandidate) {
+        const verification = verifyArchitecture(
+          resolved.base,
+          resolved.patterns,
+          relation,
+          priorities,
+          firstResponseBudgetMs,
+        );
+        if (verification.verdict === 'unknown_pattern')
+          adoption = {
+            status: 'unknown_architecture',
+            reason: verification.reason,
+          };
+        else if (verification.verdict !== 'verified' || !verification.candidate)
+          adoption = {
+            status: 'not_feasible',
+            reason: verification.reason,
+          };
+        else {
+          adoptedCandidate = {
+            ...verification.candidate,
+            origin: 'adopted',
+          };
+          architectures.push(adoptedCandidate);
+        }
+      }
+    }
+  }
   for (const tier of Object.keys(rank) as CandidateStatus[]) {
     if (tier === 'infeasible') continue;
     const members = architectures.filter((a) => a.status === tier);
@@ -518,6 +919,25 @@ export function planArchitectures(
       comparePriorities(a.tradeoffs, b.tradeoffs, priorities) ||
       (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
   );
+  if (adoptedCandidate && !adoption) {
+    if (adoptedCandidate.status !== 'feasible_under_declared_assumptions')
+      adoption = {
+        status: 'not_feasible',
+        reason: `Adopted architecture ${adoptedCandidate.id} evaluates ${adoptedCandidate.status.replaceAll('_', ' ')} under the current facts.`,
+      };
+    else if (!adoptedCandidate.frontier)
+      adoption = {
+        status: 'dominated',
+        reason: `Adopted architecture ${adoptedCandidate.id} is feasible but dominated by ${adoptedCandidate.dominatedBy ?? 'another architecture'} under the current trade-offs.`,
+      };
+    else {
+      adoption = {
+        status: 'honored',
+        reason: `Adopted architecture ${adoptedCandidate.id} is known, closed, feasible and non-dominated for the current facts.`,
+      };
+      adoptedArchitectureId = adoptedCandidate.id;
+    }
+  }
   const feasibleFrontier = architectures.filter(
     (a) => a.frontier && a.status === 'feasible_under_declared_assumptions',
   );
@@ -535,6 +955,8 @@ export function planArchitectures(
     unknownProblems: unknownProblems.map(
       (p) => `${p.description}? ${relation[p.fact].reason}`,
     ),
+    ...(adoption ? { adoption } : {}),
+    ...(adoptedArchitectureId ? { adoptedArchitectureId } : {}),
   };
 }
 function architecture(

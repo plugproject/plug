@@ -1,5 +1,15 @@
 import { createGenerator } from 'ts-json-schema-generator';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+
+// Write only on content change so watchers (tsx watch) don't restart spuriously.
+const writeIfChanged = (path: string, text: string) => {
+  try {
+    if (readFileSync(path, 'utf8') === text) return;
+  } catch {
+    // Missing file: fall through and write.
+  }
+  writeFileSync(path, text);
+};
 const schema = createGenerator({
   path: 'schema/draft/schema.ts',
   tsconfig: 'tsconfig.json',
@@ -9,7 +19,7 @@ const schema = createGenerator({
   additionalProperties: false,
   skipTypeCheck: false,
 }).createSchema('*');
-writeFileSync(
+writeIfChanged(
   'schema/draft/schema.json',
   JSON.stringify(schema, null, 2) + '\n',
 );
@@ -32,6 +42,10 @@ const roots = [
   'SystemDescription',
   'RunnerConfig',
   'SourceResponse',
+  'AuthorizedHost',
+  'ProbeEvent',
+  'OperationManifest',
+  'VerificationRecord',
   'WorkspaceIndex',
   'PatternDefinition',
   'WorkflowSpecMetadata',
@@ -41,11 +55,11 @@ const validators = standaloneCode(
   ajv,
   Object.fromEntries(roots.map((root) => [root, `plug#/definitions/${root}`])),
 );
-writeFileSync(
+writeIfChanged(
   'schema/draft/validators.js',
   '// Generated from schema.ts; do not edit.\n' + validators + '\n',
 );
-writeFileSync(
+writeIfChanged(
   'schema/draft/validators.d.ts',
   "// Generated from schema.ts; do not edit.\nimport type { ValidateFunction } from 'ajv';\n" +
     roots

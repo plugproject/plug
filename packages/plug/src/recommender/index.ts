@@ -1,5 +1,6 @@
 import { defaultPriorities, validateInput } from '../contracts/index';
 import type {
+  AuthorizedHost,
   Candidate,
   Connection,
   ConnectionReport,
@@ -25,8 +26,9 @@ import {
   obligations,
   problems,
 } from '../patterns/knowledge';
+import { operationIsReadSafe } from '../probe/plan';
 import { exactKey, hash, makeSchedule, replayCoverage } from './policy';
-import { deriveRelation, endpoints } from './relation';
+import { deriveRelation, endpoints, judgedEquivalence } from './relation';
 import { planArchitectures } from './planner';
 import { flightInput } from '../demo/flight';
 export const catalogVersion = `0.2-alpha.1/${seedCatalogVersion.split('/')[1]}+${knowledgeVersion}`;
@@ -42,12 +44,124 @@ const sum = (...values: (number | null)[]) =>
 const seedPreference = (priorities: Priority[]) =>
   (priorities.find((p) => ['latency', 'cost', 'simplicity'].includes(p)) ??
     'latency') as 'latency' | 'cost' | 'simplicity';
-export function suggestDesign(raw: unknown): DesignRecommendation {
+export interface ExecutionContext {
+  /** Explicitly authorized local-workbench origins; never supplied by hosting. */
+  authorizedHosts: readonly AuthorizedHost[];
+}
+
+function bindingExecutable(
+  input: DesignInput,
+  connection: Connection,
+  hosts: readonly AuthorizedHost[],
+) {
+  const downstream = input.systems.find(
+    (system) => system.id === connection.downstreamSystemId,
+  );
+  const operation = downstream?.operations.find(
+    (candidate) => candidate.id === connection.downstreamOperationId,
+  );
+  const iface = downstream?.interfaces.find(
+    (candidate) => candidate.id === operation?.interfaceId,
+  );
+  if (
+    !operation ||
+    !operationIsReadSafe(operation) ||
+    !operation.binding ||
+    operation.binding.request.protocol !== iface?.protocol ||
+    !operation.outputSchema ||
+    !iface?.endpoint
+  )
+    return false;
+  try {
+    const origin = new URL(iface.endpoint).origin;
+    return hosts.some((host) => host.host === origin);
+  } catch {
+    return false;
+  }
+}
+
+function applyExecutionContext(
+  input: DesignInput,
+  report: DesignRecommendation,
+  context: ExecutionContext,
+) {
+  for (const connection of input.connections) {
+    if (!bindingExecutable(input, connection, context.authorizedHosts))
+      continue;
+    const connectionReport = report.connections.find(
+      (candidate) => candidate.connectionId === connection.id,
+    )!;
+    for (const candidate of connectionReport.candidates)
+      candidate.executableHere =
+        candidate.status === 'feasible_under_declared_assumptions' &&
+        candidate.id !== 'progressive' &&
+        (candidate.id !== 'cached-live' || connection.experience.allowDeferred);
+    for (const architecture of connectionReport.architectures) {
+      const base = connectionReport.candidates.find(
+        (candidate) => candidate.id === architecture.base,
+      );
+      architecture.executableHere =
+        architecture.status === 'feasible_under_declared_assumptions' &&
+        architecture.patterns.length === 1 &&
+        !!base?.executableHere;
+    }
+  }
+  return report;
+}
+function evaluationFingerprint(
+  input: DesignInput,
+  connection: Connection,
+  executable: boolean,
+) {
+  const { caller, downstream, callerOp, op } = endpoints(input, connection);
+  return hash({
+    caller: {
+      ...caller,
+      id: 'caller',
+      operations: [{ ...callerOp, id: 'caller-operation' }],
+    },
+    downstream: {
+      ...downstream,
+      id: 'downstream',
+      operations: [{ ...op, id: 'downstream-operation' }],
+    },
+    connection: {
+      ...connection,
+      id: 'connection',
+      callerSystemId: 'caller',
+      callerOperationId: 'caller-operation',
+      downstreamSystemId: 'downstream',
+      downstreamOperationId: 'downstream-operation',
+      profile: {
+        ...connection.profile,
+        systemId: 'downstream',
+        operationId: 'downstream-operation',
+      },
+    },
+    infrastructure: input.infrastructure,
+    executable,
+  });
+}
+export function suggestDesign(
+  raw: unknown,
+  executionContext?: ExecutionContext,
+): DesignRecommendation {
   const input = validateInput(raw);
   const bundled = hash(input) === hash(flightInput());
-  const connections = input.connections.map((c, i) =>
-    evaluateConnection(input, c, bundled && i === 0),
-  );
+  const evaluated = new Map<string, ConnectionReport>();
+  const connections = input.connections.map((connection, index) => {
+    const executable = bundled && index === 0;
+    const key = evaluationFingerprint(input, connection, executable);
+    const previous = evaluated.get(key);
+    if (previous)
+      return {
+        ...structuredClone(previous),
+        connectionId: connection.id,
+      };
+    const report = evaluateConnection(input, connection, executable);
+    evaluated.set(key, report);
+    return report;
+  });
   const crossConnection = crossConnectionCriteria(input, connections);
   const prefix = input.connections.length > 1;
   const result = {
@@ -77,7 +191,18 @@ export function suggestDesign(raw: unknown): DesignRecommendation {
       ]),
     ],
   };
-  return { ...result, designHash: hash(result) };
+  const report = { ...result, designHash: hash(result) };
+  return executionContext
+    ? applyExecutionContext(input, report, executionContext)
+    : report;
+}
+/** The author pin is effective only while deterministic re-verification honors it. */
+export function effectiveArchitectureId(
+  report: ConnectionReport,
+): string | null {
+  return report.adoption?.status === 'honored' && report.adoptedArchitectureId
+    ? report.adoptedArchitectureId
+    : report.selectedArchitectureId;
 }
 function evaluateConnection(
   input: DesignInput,
@@ -109,6 +234,8 @@ function evaluateConnection(
     relation,
     priorities,
     budgets.length ? Math.min(...budgets) : null,
+    c.adoptedArchitecture ?? null,
+    catalogVersion,
   );
   return {
     connectionId: c.id,
@@ -120,6 +247,10 @@ function evaluateConnection(
     patterns: plan.patterns,
     architectures: plan.architectures,
     selectedArchitectureId: plan.selectedArchitectureId,
+    ...(plan.adoptedArchitectureId
+      ? { adoptedArchitectureId: plan.adoptedArchitectureId }
+      : {}),
+    ...(plan.adoption ? { adoption: plan.adoption } : {}),
     policyDecisionNeeded: plan.policyDecisionNeeded,
     priorities,
     missingInformation: [
@@ -303,13 +434,22 @@ function evaluateCandidates(
       id === 'progressive'
         ? (x.initialOutput?.meaning ?? null)
         : sem.outputMeaning;
+    const judged =
+      id === 'progressive'
+        ? null
+        : judgedEquivalence(c, outputMeaning, x.usefulOutput);
     add(
       'semantics',
-      outputMeaning === null ? null : outputMeaning === x.usefulOutput,
-      'The operation must produce the requested useful output; names, progress acknowledgements and skill prose cannot establish equivalence.',
+      outputMeaning === null
+        ? null
+        : outputMeaning === x.usefulOutput ||
+            (judged ? judged.equivalent : false),
+      judged
+        ? `A recorded judgment compared the differing texts: ${judged.evidence.note}`
+        : 'The operation must produce the requested useful output; names, progress acknowledgements and skill prose cannot establish equivalence.',
       outputMeaning,
       x.usefulOutput,
-      [sem.evidence],
+      judged ? [sem.evidence, judged.evidence] : [sem.evidence],
     );
     let interval: number | null = null,
       schedule: RunnerConfig['schedule'] = [],
@@ -794,10 +934,14 @@ export function explainDesign(report: DesignRecommendation): string {
 }
 function explainConnection(r: ConnectionReport): string {
   const selected = r.architectures.find(
-    (a) => a.id === r.selectedArchitectureId,
+    (a) => a.id === effectiveArchitectureId(r),
   );
+  const adoption =
+    r.adoption === undefined
+      ? ''
+      : `\n\nAuthor adoption: ${r.adoption.status}. ${r.adoption.reason}`;
   return (
-    `# Connection ${r.connectionId}\n\nSelected design: ${r.selectedId ?? 'No feasible candidate under supplied facts and supported catalog'}\n\nSelected architecture: ${selected ? selected.patterns.join(' + ') : 'None feasible under supplied facts and supported catalog'}${r.policyDecisionNeeded ? '\n\nNo unique best architecture: the top feasible architectures tie on every declared priority; one more policy decision is needed.' : ''}\n\nPriorities: ${r.priorities.join(' > ')}\n\nCost ranking: ${r.costRankingAvailable ? 'available' : 'unavailable; missing cost is not zero'}\n\n` +
+    `# Connection ${r.connectionId}\n\nSelected design: ${r.selectedId ?? 'No feasible candidate under supplied facts and supported catalog'}\n\nEffective architecture: ${selected ? selected.patterns.join(' + ') : 'None feasible under supplied facts and supported catalog'}${adoption}${r.policyDecisionNeeded ? '\n\nNo unique best architecture: the top feasible architectures tie on every declared priority; one more policy decision is needed.' : ''}\n\nPriorities: ${r.priorities.join(' > ')}\n\nCost ranking: ${r.costRankingAvailable ? 'available' : 'unavailable; missing cost is not zero'}\n\n` +
     `## Relation facts\n\n| Predicate | Value | Reason |\n|---|---|---|\n${Object.entries(
       r.relation,
     )

@@ -59,17 +59,25 @@ describe('Plug MCP server over stdio', () => {
     expect(client.getServerVersion()?.name).toBe('plug');
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
+      'plug_add_system',
+      'plug_adopt_design',
       'plug_analyze',
       'plug_explain',
       'plug_get_spec',
       'plug_index_workspace',
+      'plug_list_spec_revisions',
+      'plug_probe',
+      'plug_review_design',
       'plug_update_spec',
+      'plug_verify_edge',
     ]);
     expect(
       tools.find((t) => t.name === 'plug_get_spec')?.annotations?.readOnlyHint,
     ).toBe(true);
     const { resources } = await client.listResources();
     expect(resources.map((r) => r.uri)).toContain('plug://spec/workflow.yaml');
+    expect(resources.map((r) => r.uri)).toContain('plug://manifest');
+    expect(resources.map((r) => r.uri)).toContain('plug://verifications');
   });
   it('reads, updates and re-reads the spec of record', async () => {
     const empty = (await call('plug_get_spec')).json();
@@ -85,6 +93,14 @@ describe('Plug MCP server over stdio', () => {
     });
     expect(written.connections[0].tasks.length).toBeGreaterThan(0);
     expect(existsSync(join(workspace, '.plug', 'AGENTS.md'))).toBe(true);
+    const historical = (
+      await call('plug_get_spec', {
+        revision: written.revisionId,
+        include: ['workflow'],
+      })
+    ).json();
+    expect(historical.files['workflow.yaml']).toContain('dsl: 1.0.3');
+    expect(historical.files.workflow).toBeUndefined();
     const spec = (
       await call('plug_get_spec', { include: ['workflow'] })
     ).json();

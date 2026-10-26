@@ -8,9 +8,12 @@ import type {
 } from '../contracts/index';
 import { cached, scheduled } from '../patterns/catalog';
 import { exactKey } from '../recommender/policy';
+import { PlugEnvelopeAdapter, type SourceAdapter } from './source-adapters';
 export interface DemoOptions {
-  /** Explicit trusted local binding; never populated from a submitted descriptor. */
-  endpoint: string;
+  /** Existing Plug envelope endpoint. Use sourceAdapter for an authorized real binding. */
+  endpoint?: string;
+  /** Explicitly constructed local adapter; never populated directly from submitted JSON. */
+  sourceAdapter?: SourceAdapter;
   outputSchema: JsonObject;
   inputSchema?: JsonObject;
   onEvent: (event: DemoEvent) => void;
@@ -49,16 +52,14 @@ export function runDemo(design: Candidate, options: DemoOptions) {
   )
     throw new Error('Live updates are not permitted by this experience');
   assertContract('RunnerConfig', config);
-  const url = new URL(options.endpoint);
-  if (
-    url.protocol !== 'http:' ||
-    !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) ||
-    url.username ||
-    url.password
-  )
-    throw new Error(
-      'Execution requires an explicitly trusted loopback HTTP binding',
-    );
+  if (options.endpoint && options.sourceAdapter)
+    throw new Error('Choose either endpoint or sourceAdapter');
+  const selectedAdapter =
+    options.sourceAdapter ??
+    (options.endpoint ? new PlugEnvelopeAdapter(options.endpoint) : null);
+  if (!selectedAdapter)
+    throw new Error('Execution requires an explicit source adapter');
+  const sourceAdapter: SourceAdapter = selectedAdapter;
   if (
     config.timeoutMs === null ||
     config.timeoutMs <= 0 ||
@@ -201,37 +202,14 @@ export function runDemo(design: Candidate, options: DemoOptions) {
       });
     const promise = (async () => {
       try {
-        const response = await fetch(options.endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Plug-Refresh': String(refresh),
-          },
-          body: JSON.stringify(key),
+        const adapted = await sourceAdapter.request({
+          key,
+          refresh,
           signal: controller.signal,
-          redirect: 'error',
+          maxBytes: Math.min(config.maxBytes, 1048576),
         });
-        if (!response.ok) throw new Error(`Source HTTP ${response.status}`);
-        const reader = response.body!.getReader();
-        let size = 0;
-        const chunks: Uint8Array[] = [];
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          size += value.length;
-          if (size > config.maxBytes || size > 1048576) {
-            controller.abort();
-            throw new Error('Source response exceeds memory limit');
-          }
-          chunks.push(value);
-        }
-        const combined = new Uint8Array(size);
-        let offset = 0;
-        for (const chunk of chunks) {
-          combined.set(chunk, offset);
-          offset += chunk.length;
-        }
-        const data: unknown = JSON.parse(new TextDecoder().decode(combined));
+        const data: unknown = adapted.response;
+        const size = adapted.bytes;
         assertContract<SourceResponse>('SourceResponse', data);
         if (!validate(data.data))
           throw new Error('Source output contract validation failed');

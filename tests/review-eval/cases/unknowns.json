@@ -1,0 +1,8 @@
+{
+  "id": "unknowns",
+  "input": "schema/draft/examples/DesignInput/flight.json",
+  "variant": "unknowns",
+  "operationalContext": "",
+  "expectedEngine": null,
+  "expectedAdoptable": []
+}

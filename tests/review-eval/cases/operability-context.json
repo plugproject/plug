@@ -1,0 +1,8 @@
+{
+  "id": "operability-context",
+  "input": "schema/draft/examples/DesignInput/flight.json",
+  "variant": "direct-feasible",
+  "operationalContext": "The team cannot operate stateful infrastructure or scheduled jobs.",
+  "expectedEngine": "direct",
+  "expectedAdoptable": ["direct", "scheduled-cache"]
+}

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { flightInput, fact } from '../packages/plug/src/demo/flight';
 import {
+  catalogVersion,
   suggestDesign,
   explainDesign,
 } from '../packages/plug/src/recommender/index';
@@ -10,6 +11,7 @@ import {
   makeSchedule,
   replayCoverage,
 } from '../packages/plug/src/recommender/policy';
+import { deriveRelation } from '../packages/plug/src/recommender/relation';
 import type {
   DesignInput,
   PatternId,
@@ -18,6 +20,81 @@ const cx = (input: DesignInput) => input.connections[0];
 const report = (input: DesignInput) => suggestDesign(input).connections[0];
 const candidate = (input: DesignInput, id: PatternId = 'scheduled-cache') =>
   report(input).candidates.find((c) => c.id === id)!;
+describe('relation facts', () => {
+  it('derives protocol compatibility from any calls interface of the caller system', () => {
+    const input = flightInput();
+    const c = cx(input);
+    const caller = input.systems.find((s) => s.id === c.callerSystemId)!;
+    const op = caller.operations.find((o) => o.id === c.callerOperationId)!;
+    // The indexed-draft shape: the caller operation sits on an exposes interface.
+    const client = caller.interfaces.find((i) => i.direction === 'calls')!;
+    caller.interfaces = [
+      { ...client, id: 'own-api', direction: 'exposes' },
+      client,
+    ];
+    op.interfaceId = 'own-api';
+    const relation = deriveRelation(input, c);
+    expect(relation.protocolCompatible.value).toBe(true);
+    expect(relation.protocolCompatible.reason).toContain(client.id);
+    // Without any matching calls interface the connection is incompatible.
+    caller.interfaces = [{ ...client, id: 'own-api', direction: 'exposes' }];
+    const without = deriveRelation(input, c);
+    expect(without.protocolCompatible.value).toBe(false);
+    expect(without.protocolCompatible.reason).toContain(
+      'no caller interface matches',
+    );
+  });
+  it('lets a pinned judgment qualify differing semantic texts, and only that', () => {
+    const judged = (equivalent: boolean, outputMeaning: string) => ({
+      equivalent,
+      outputMeaning,
+      usefulOutput: 'flight options, indicative',
+      evidence: {
+        kind: 'judged' as const,
+        note: 'test-model: the denoted result is the same.',
+        confidence: 0.9,
+      },
+    });
+    const differing = () => {
+      const input = flightInput();
+      cx(input).experience.usefulOutput = 'flight options, indicative';
+      return input;
+    };
+    // Strict comparison without a judgment: differing strings fail.
+    const strict = differing();
+    expect(deriveRelation(strict, cx(strict)).semanticMatch.value).toBe(false);
+    // A judgment pinned to exactly these strings qualifies the verdict.
+    const input = differing();
+    cx(input).semanticEquivalence = judged(true, 'indicative flight options');
+    const relation = deriveRelation(input, cx(input));
+    expect(relation.semanticMatch.value).toBe(true);
+    expect(relation.semanticMatch.reason).toContain('Judged equivalent');
+    expect(
+      relation.semanticMatch.evidence.some((e) => e.kind === 'judged'),
+    ).toBe(true);
+    const semantics = candidate(input, 'direct').criteria.find(
+      (criterion) => criterion.id === 'semantics',
+    )!;
+    expect(semantics.verdict).toBe('pass_under_assumptions');
+    expect(semantics.evidence!.some((e) => e.kind === 'judged')).toBe(true);
+    // A judgment pinned to other text is void: the strict comparison rules.
+    const stale = differing();
+    cx(stale).semanticEquivalence = judged(true, 'something else entirely');
+    expect(deriveRelation(stale, cx(stale)).semanticMatch.value).toBe(false);
+    expect(deriveRelation(stale, cx(stale)).semanticMatch.reason).toContain(
+      'compared with required',
+    );
+    // A negative judgment keeps the failure and carries its evidence.
+    const negative = differing();
+    cx(negative).semanticEquivalence = judged(
+      false,
+      'indicative flight options',
+    );
+    const no = deriveRelation(negative, cx(negative));
+    expect(no.semanticMatch.value).toBe(false);
+    expect(no.semanticMatch.reason).toContain('not equivalent');
+  });
+});
 describe('architecture evaluation', () => {
   it('introduces scheduled cache from slow-source facts and replays each policy separately', () => {
     const input = flightInput(),
@@ -233,4 +310,158 @@ it('preserves unsupported schemas as an evaluation prerequisite', () => {
   expect(
     candidate(input).criteria.find((c) => c.id === 'contract')?.verdict,
   ).toBe('unknown');
+});
+
+describe('author architecture adoption', () => {
+  const evidence = {
+    kind: 'declared' as const,
+    note: 'Adopted by the author in a test.',
+  };
+  const adopt = (
+    input: DesignInput,
+    architectureId: string,
+    patterns: string[],
+    version = catalogVersion,
+  ) => {
+    cx(input).adoptedArchitecture = {
+      architectureId,
+      patterns,
+      catalogVersion: version,
+      evidence,
+    };
+  };
+
+  it('omits optional adoption fields and preserves the flight design hash', () => {
+    const design = suggestDesign(flightInput());
+    const connection = design.connections[0];
+    expect(design.designHash).toBe(
+      '19667d19c6f9148485d3db4eb98bba6c41b2a228270de53b00ebce415696ba3d',
+    );
+    expect(Object.hasOwn(connection, 'adoption')).toBe(false);
+    expect(Object.hasOwn(connection, 'adoptedArchitectureId')).toBe(false);
+    expect(
+      connection.architectures.some((architecture) =>
+        Object.hasOwn(architecture, 'origin'),
+      ),
+    ).toBe(false);
+  });
+
+  it('honors an existing architecture by canonical pattern set', () => {
+    const input = flightInput();
+    input.systems[1].trustDomain = 'external';
+    const initial = suggestDesign(input);
+    const initialConnection = initial.connections[0];
+    const selected = initialConnection.architectures.find(
+      (architecture) =>
+        architecture.id === initialConnection.selectedArchitectureId,
+    )!;
+    expect(selected.patterns.length).toBeGreaterThan(1);
+    adopt(
+      input,
+      selected.id,
+      [...selected.patterns].reverse(),
+      initial.catalogVersion,
+    );
+
+    const analyzed = suggestDesign(input).connections[0];
+    expect(analyzed.adoption).toMatchObject({ status: 'honored' });
+    expect(analyzed.adoptedArchitectureId).toBe(selected.id);
+    expect(analyzed.selectedArchitectureId).toBe(selected.id);
+    expect(
+      analyzed.architectures.find(
+        (architecture) => architecture.id === selected.id,
+      )?.patterns,
+    ).toEqual(selected.patterns);
+  });
+
+  it('inserts an adopted stack before dominance and reports dominated', () => {
+    const input = flightInput();
+    adopt(input, 'scheduled-cache+timeout', ['timeout', 'scheduled-cache']);
+    const analyzed = suggestDesign(input).connections[0];
+    const inserted = analyzed.architectures.find(
+      (architecture) => architecture.id === 'scheduled-cache+timeout',
+    );
+    expect(inserted).toMatchObject({
+      origin: 'adopted',
+      frontier: false,
+      dominatedBy: 'scheduled-cache',
+      patterns: ['scheduled-cache', 'timeout'],
+    });
+    expect(analyzed.adoption).toMatchObject({ status: 'dominated' });
+    expect(Object.hasOwn(analyzed, 'adoptedArchitectureId')).toBe(false);
+    expect(analyzed.selectedArchitectureId).toBe('scheduled-cache');
+  });
+
+  it('reports infeasible and conditional adoptions as not feasible', () => {
+    const infeasible = flightInput();
+    adopt(infeasible, 'direct', ['direct']);
+    expect(report(infeasible).adoption).toMatchObject({
+      status: 'not_feasible',
+    });
+
+    const conditional = flightInput();
+    cx(conditional).profile.responseBytes = fact(null);
+    adopt(conditional, 'scheduled-cache', ['scheduled-cache']);
+    const analyzed = report(conditional);
+    expect(
+      analyzed.architectures.find(
+        (architecture) => architecture.id === 'scheduled-cache',
+      )?.status,
+    ).toBe('conditional');
+    expect(analyzed.adoption).toMatchObject({ status: 'not_feasible' });
+    expect(Object.hasOwn(analyzed, 'adoptedArchitectureId')).toBe(false);
+  });
+
+  it('reports unknown architectures and catalog changes explicitly', () => {
+    const unknown = flightInput();
+    adopt(unknown, 'scheduled-cache+unknown-pattern', [
+      'scheduled-cache',
+      'unknown-pattern',
+    ]);
+    const unknownReport = report(unknown);
+    expect(unknownReport.adoption).toMatchObject({
+      status: 'unknown_architecture',
+    });
+    expect(unknownReport.adoption?.reason).toContain('unknown-pattern');
+
+    const changed = flightInput();
+    adopt(changed, 'scheduled-cache', ['scheduled-cache'], 'old-catalog');
+    const changedReport = report(changed);
+    expect(changedReport.adoption).toMatchObject({
+      status: 'catalog_changed',
+    });
+    expect(changedReport.adoption?.reason).toContain(catalogVersion);
+    expect(Object.hasOwn(changedReport, 'adoptedArchitectureId')).toBe(false);
+  });
+
+  it('invalidates an honored adoption when reanalysis makes it infeasible', () => {
+    const input = flightInput();
+    adopt(input, 'scheduled-cache', ['scheduled-cache']);
+    expect(report(input).adoption).toMatchObject({ status: 'honored' });
+
+    input.infrastructure.cacheAllowed = false;
+    const reanalyzed = report(input);
+    expect(reanalyzed.adoption).toMatchObject({ status: 'not_feasible' });
+    expect(Object.hasOwn(reanalyzed, 'adoptedArchitectureId')).toBe(false);
+    expect(reanalyzed.selectedArchitectureId).not.toBe('scheduled-cache');
+  });
+});
+
+it('analyzes two hundred connections without a count ceiling', () => {
+  const input = flightInput();
+  const template = input.connections[0];
+  const operation = input.systems[0].operations[0];
+  input.systems[0].operations = Array.from({ length: 200 }, (_, index) => ({
+    ...structuredClone(operation),
+    id: `caller-operation-${index + 1}`,
+  }));
+  input.connections = Array.from({ length: 200 }, (_, index) => ({
+    ...structuredClone(template),
+    id: `connection-${index + 1}`,
+    callerOperationId: `caller-operation-${index + 1}`,
+  }));
+  const started = performance.now();
+  const design = suggestDesign(input);
+  expect(design.connections).toHaveLength(200);
+  expect(performance.now() - started).toBeLessThan(2000);
 });

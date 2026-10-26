@@ -19,9 +19,16 @@ export default defineConfig({
       timeout: 60000,
     },
     {
-      // The packaged workbench; run npm run build first.
+      // The packaged workbench; run npm run build first. The judge runs the
+      // explicit non-model stub so no test ever spends or needs credentials.
       command: `rm -rf "${process.env.PLUG_WORKBENCH_DIR}" && mkdir -p "${process.env.PLUG_WORKBENCH_DIR}" && node packages/plug/dist/cli.js ui --port ${workbenchPort} --workspace "${process.env.PLUG_WORKBENCH_DIR}"`,
       url: `${process.env.PLUG_WORKBENCH_URL}/api/examples`,
+      env: {
+        PLUG_JUDGE_PROVIDER: 'stub',
+        PLUG_DRAFT_PROVIDER: 'stub',
+        PLUG_REVIEW_PROVIDER: 'stub',
+        X_API_KEY: 'browser-fixture-key',
+      },
       reuseExistingServer: false,
       timeout: 60000,
     },

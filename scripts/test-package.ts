@@ -67,6 +67,15 @@ for (const row of connection.workload.trace)
   row.key = connection.workload.prewarmKeys[0];
 writeFileSync(join(dir, 'input.json'), JSON.stringify(input));
 const bin = join(dir, 'node_modules/@plugproject/plug/dist/cli.js');
+const environmentStatus = JSON.parse(
+  execFileSync(
+    process.execPath,
+    [bin, 'setup', '--check', '--workspace', dir],
+    { cwd: dir, encoding: 'utf8', env: {} },
+  ),
+);
+assert.equal(environmentStatus.core.state, 'ready');
+assert.equal(environmentStatus.judgment.state, 'disabled');
 const report = JSON.parse(
   execFileSync(
     process.execPath,
@@ -110,6 +119,17 @@ assert.deepEqual(cursorConfig.mcpServers.plug.args.slice(0, 3), [
   'plug',
   'mcp',
 ]);
+execFileSync(process.execPath, [bin, 'skill', 'install', '--ide', 'cursor'], {
+  cwd: dir,
+  encoding: 'utf8',
+});
+assert.ok(
+  readFileSync(join(dir, '.agents/skills/plug/SKILL.md'), 'utf8').includes(
+    'name: plug',
+  ),
+  'packed CLI installs the portable Plug skill',
+);
+writeFileSync(join(dir, '.env.local'), 'PLUG_REVIEW_PROVIDER=stub\n');
 const mcp = new Client({ name: 'plug-package-test', version: '0.0.0' });
 await mcp.connect(
   new StdioClientTransport({
@@ -122,14 +142,33 @@ await mcp.connect(
 try {
   const tools = (await mcp.listTools()).tools.map((t) => t.name).sort();
   assert.deepEqual(tools, [
+    'plug_add_system',
+    'plug_adopt_design',
     'plug_analyze',
     'plug_explain',
     'plug_get_spec',
     'plug_index_workspace',
+    'plug_list_spec_revisions',
+    'plug_probe',
+    'plug_review_design',
     'plug_update_spec',
+    'plug_verify_edge',
   ]);
+  const resources = (await mcp.listResources()).resources.map(
+    (resource) => resource.uri,
+  );
+  assert.ok(resources.includes('plug://manifest'));
+  assert.ok(resources.includes('plug://verifications'));
   const spec = await mcp.callTool({ name: 'plug_get_spec', arguments: {} });
   assert.ok(!spec.isError, 'packed MCP server reads the spec');
+  const review = await mcp.callTool({
+    name: 'plug_review_design',
+    arguments: { connectionId: 'primary' },
+  });
+  assert.ok(
+    !review.isError,
+    'packed MCP server loads provider configuration from .env.local',
+  );
 } finally {
   await mcp.close();
 }
@@ -175,7 +214,7 @@ assert.ok(
 );
 writeFileSync(
   join(dir, 'consumer.ts'),
-  "import { suggestDesign, type DesignInput } from '@plugproject/plug'; declare const input: DesignInput; const hash: string = suggestDesign(input).designHash; console.log(hash);\n",
+  "import { inspectPlugEnvironment, suggestDesign, type DesignInput } from '@plugproject/plug'; declare const input: DesignInput; const hash: string = suggestDesign(input).designHash; const core: 'ready' = inspectPlugEnvironment({}).core.state; console.log(hash, core);\n",
 );
 execFileSync(
   process.execPath,

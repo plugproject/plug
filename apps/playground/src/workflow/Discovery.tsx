@@ -10,8 +10,9 @@ import type { Discovery } from '../../../../packages/plug/src/discovery/index';
 import {
   importA2a,
   importMcp,
+  openApiSystem,
 } from '../../../../packages/plug/src/importers/index';
-import { limits, setOperations, uniqueId } from './model';
+import { setOperations, uniqueId } from './model';
 /** A listed tool or skill, and why Plug cannot use it when it cannot. */
 type Method = {
   id: string;
@@ -40,6 +41,25 @@ function methodsOf(found: Discovery): Method[] {
             ]
           : [],
     );
+  if (found.protocol === 'http')
+    return found.operations.flatMap((o) => {
+      if (!isObject(o) || typeof o.id !== 'string' || !o.id) return [];
+      const http = isObject(o.metadata)
+        ? (o.metadata.http as JsonObject | undefined)
+        : undefined;
+      const title = isObject(http)
+        ? `${text(http.method).toUpperCase()} ${text(http.path)}`.trim()
+        : '';
+      return [
+        {
+          id: o.id,
+          title,
+          description: text(o.description),
+          problem: null,
+          raw: o,
+        },
+      ];
+    });
   return found.tools.map((t) => {
     let problem: string | null = null;
     if (!isObject(t.inputSchema))
@@ -88,18 +108,34 @@ interface ServerDiscoveryProps {
   /** Only the local workbench reaches servers; the hosted playground never does. */
   local: boolean;
   edit: (fn: (next: DesignInput) => void) => void;
+  onApplied?: (systemId: string, name: string) => void;
 }
-/** Server details for an MCP or A2A system, and the tools or skills its server lists. */
+/** Server or document details for a system, and the tools, skills or operations it lists. */
 export function ServerDiscovery({
   input,
   system,
   local,
   edit,
+  onApplied,
 }: ServerDiscoveryProps) {
   const face = system.interfaces[0];
-  const protocol = face.protocol === 'a2a' ? 'a2a' : 'mcp';
-  const noun = protocol === 'mcp' ? 'tool' : 'skill';
-  const [url, setUrl] = useState(face.endpoint ?? '');
+  const protocol = face.protocol;
+  const noun =
+    protocol === 'mcp' ? 'tool' : protocol === 'a2a' ? 'skill' : 'operation';
+  const lastDiscovery = isObject(system.metadata?.discovery)
+    ? system.metadata.discovery
+    : undefined;
+  /** A system that has never named a server nor been discovered: index it first. */
+  const fresh = !face.endpoint && !lastDiscovery;
+  const [url, setUrl] = useState(
+    // An HTTP system's endpoint is its server base; the document URL is kept
+    // as discovery provenance and prefilled here.
+    protocol === 'http'
+      ? typeof lastDiscovery?.url === 'string'
+        ? lastDiscovery.url
+        : ''
+      : (face.endpoint ?? ''),
+  );
   const [headerText, setHeaderText] = useState('');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState('');
@@ -132,17 +168,22 @@ export function ServerDiscovery({
     ? ''
     : found.protocol === 'mcp'
       ? (found.server.title ?? found.server.name)
-      : text(found.card.name) || 'Agent';
+      : found.protocol === 'http'
+        ? found.info.title
+        : text(found.card.name) || 'Agent';
   const firstPicks = (next: Discovery) => {
     const listed = methodsOf(next),
       ids = usableIds(listed);
     const kept = system.operations
       .filter((o) => ids.has(o.id) || links(o.id) > 0)
       .map((o) => o.id);
-    if (kept.length) return kept.slice(0, limits.operations);
-    return ids.size <= limits.operations ? [...ids] : [];
+    if (kept.length) return kept;
+    return [...ids];
   };
   const saveUrl = () => {
+    // The OpenAPI document URL is not the server endpoint; applying a
+    // discovery sets the endpoint from the document's servers entry.
+    if (protocol === 'http') return;
     const next = savedEndpoint(url);
     if (!next || next === face.endpoint) return;
     edit((d) => {
@@ -192,13 +233,7 @@ export function ServerDiscovery({
     setBusy(false);
   };
   const toggle = (id: string) =>
-    setPicked((p) =>
-      p.includes(id)
-        ? p.filter((x) => x !== id)
-        : p.length < limits.operations
-          ? [...p, id]
-          : p,
-    );
+    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
   const apply = () => {
     if (!found) return;
     const chosen = methods.filter((m) => !m.problem && picked.includes(m.id));
@@ -216,10 +251,19 @@ export function ServerDiscovery({
               protocolVersion: found.protocolVersion,
               response: { tools: chosen.map((m) => m.raw) },
             })
-          : importA2a(
-              { ...found.card, skills: chosen.map((m) => m.raw) },
-              s.id,
-            );
+          : found.protocol === 'http'
+            ? openApiSystem({
+                id: s.id,
+                name: serverName,
+                openapiVersion: found.openapiVersion,
+                serverUrl: found.serverUrl,
+                operations: chosen.map((m) => m.raw) as unknown as Operation[],
+                documentUrl: found.url,
+              })
+            : importA2a(
+                { ...found.card, skills: chosen.map((m) => m.raw) },
+                s.id,
+              );
       if (found.protocol === 'mcp')
         s.interfaces[0] = {
           ...was,
@@ -228,6 +272,15 @@ export function ServerDiscovery({
           direction: 'exposes',
           binding: 'MCP',
           endpoint: found.url,
+        };
+      else if (found.protocol === 'http')
+        s.interfaces[0] = {
+          ...was,
+          protocol: 'http',
+          version: '1.1',
+          direction: 'exposes',
+          binding: 'HTTP+JSON',
+          ...(found.serverUrl ? { endpoint: found.serverUrl } : {}),
         };
       else if (review) {
         const rest = s.interfaces.slice(1);
@@ -268,13 +321,20 @@ export function ServerDiscovery({
           protocol: found.protocol,
           url: found.url,
           discoveredAt: found.discoveredAt,
+          // The workbench's own fetch time: synthetic, not a production measurement.
+          fetchMs: found.fetchMs,
           ...(found.protocol === 'mcp'
             ? {
                 server: { ...found.server },
                 protocolVersion: found.protocolVersion,
                 complete: found.complete,
               }
-            : {}),
+            : found.protocol === 'http'
+              ? {
+                  openapiVersion: found.openapiVersion,
+                  complete: found.complete,
+                }
+              : {}),
         } as JsonObject,
       };
       summary = {
@@ -290,6 +350,7 @@ export function ServerDiscovery({
       return setProblem((e as Error).message);
     }
     edit(change);
+    onApplied?.(system.id, summary.name || system.name);
     const source = summary.name === serverName ? 'the server' : serverName;
     const parts = [
       chosen.length && `${plural(chosen.length, noun)} from ${source}`,
@@ -309,25 +370,50 @@ export function ServerDiscovery({
   return (
     <section
       className="discovery"
-      aria-label={protocol === 'mcp' ? 'MCP server' : 'A2A agent'}
+      aria-label={
+        protocol === 'mcp'
+          ? 'MCP server'
+          : protocol === 'a2a'
+            ? 'A2A agent'
+            : 'OpenAPI service'
+      }
     >
-      <h3>{protocol === 'mcp' ? 'MCP server' : 'A2A agent'}</h3>
+      <h3>
+        {protocol === 'mcp'
+          ? 'MCP server'
+          : protocol === 'a2a'
+            ? 'A2A agent'
+            : 'OpenAPI service'}
+      </h3>
       <label>
         {protocol === 'mcp'
           ? 'Streamable HTTP endpoint'
-          : 'Agent URL or Agent Card URL'}
+          : protocol === 'a2a'
+            ? 'Agent URL or Agent Card URL'
+            : 'OpenAPI document URL'}
         <input
           type="url"
           value={url}
           placeholder={
             protocol === 'mcp'
               ? 'https://example.com/mcp'
-              : 'https://agent.example.com'
+              : protocol === 'a2a'
+                ? 'https://agent.example.com'
+                : 'https://example.com/openapi.json'
           }
           spellCheck={false}
           autoComplete="off"
+          // A just-added system starts at its server: enter the URL and press
+          // Enter to list what it exposes before describing anything by hand.
+          autoFocus={local && fresh}
           onChange={(e) => setUrl(e.target.value)}
           onBlur={saveUrl}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter' || !local || busy || !url.trim()) return;
+            e.preventDefault();
+            saveUrl();
+            void run();
+          }}
         />
       </label>
       {local ? (
@@ -360,7 +446,9 @@ export function ServerDiscovery({
           <p className="small">
             {protocol === 'mcp'
               ? 'Plug opens a session, lists the tools and ends the session. It never calls a tool.'
-              : 'Plug reads the public Agent Card. It never sends the agent a message.'}{' '}
+              : protocol === 'a2a'
+                ? 'Plug reads the public Agent Card. It never sends the agent a message.'
+                : 'Plug reads the OpenAPI document. It never calls an operation.'}{' '}
             The URL is kept without its query string; headers are not kept.
           </p>
         </>
@@ -368,8 +456,8 @@ export function ServerDiscovery({
         <p className="small">
           Discovery runs in the local workbench, which can reach your servers:
           run <code>npx plug ui</code> in your project. This hosted playground
-          never contacts them; paste a tools/list response or Agent Card under
-          Import MCP / A2A metadata instead.
+          never contacts them; paste a tools/list response, Agent Card or
+          OpenAPI document under Import metadata instead.
         </p>
       )}
       {problem && (
@@ -383,7 +471,9 @@ export function ServerDiscovery({
             {serverName} ·{' '}
             {found.protocol === 'mcp'
               ? `MCP ${found.protocolVersion}`
-              : 'Agent Card'}{' '}
+              : found.protocol === 'http'
+                ? `OpenAPI ${found.openapiVersion}`
+                : 'Agent Card'}{' '}
             · {plural(methods.length, noun)}
           </legend>
           {found.notes.map((n) => (
@@ -392,8 +482,11 @@ export function ServerDiscovery({
             </p>
           ))}
           <p className="small">
-            Choose up to {limits.operations} as this system&apos;s operations ·{' '}
-            {picked.length} chosen
+            Listed in {found.fetchMs} ms by this workbench — a synthetic
+            observation, not a production measurement.
+          </p>
+          <p className="small">
+            Choose this system&apos;s operations · {picked.length} chosen
           </p>
           {methods.length + others.length > 8 && (
             <input
@@ -415,10 +508,7 @@ export function ServerDiscovery({
                       <input
                         type="checkbox"
                         checked={on}
-                        disabled={
-                          !!m.problem ||
-                          (!on && picked.length >= limits.operations)
-                        }
+                        disabled={!!m.problem}
                         onChange={() => toggle(m.id)}
                       />
                       <span>
@@ -445,7 +535,6 @@ export function ServerDiscovery({
                       <input
                         type="checkbox"
                         checked={on}
-                        disabled={!on && picked.length >= limits.operations}
                         onChange={() => toggle(o.id)}
                       />
                       <span>

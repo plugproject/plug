@@ -26,7 +26,10 @@ checks test the shared call budget and each downstream quota shared by connectio
 Outputs include direct/proposed diagrams, introduced components, exact configuration,
 policy fingerprint, input/catalog/design hashes, estimates, assumptions, tradeoffs,
 prerequisites and ordered tasks. Reports separate metadata understood, design evaluated
-and executable here. Only seed designs without added patterns are executable here.
+and executable here. In the local workbench, a passing supported seed design is
+executable when the selected read operation has an HTTP request/response binding,
+an output contract and an explicitly authorized origin. Hosted execution stays
+fixture-only. Added-pattern compositions remain design output.
 No feasible candidate is a valid result within this catalog.
 
 Demo sessions start empty, permit two cached entries, 1 MB, two simultaneous upstream
@@ -38,5 +41,16 @@ cancellation, lifetime or shutdown has one terminal state, invalidates tokens an
 clears resources. Rate limits use bounded per-IP admission. Late responses are
 ignored and expired snapshots are not served.
 
-Local runtime accepts only explicitly trusted loopback HTTP with the fixed response
-envelope and tested JSON Schema dialects. Authenticated MCP/A2A execution is deferred.
+Local runtime supports the fixed Plug response envelope and plain REST bindings that
+map a declared response into `{snapshotAt, version, data}`. Non-loopback HTTP(S)
+requires an exact origin in `.plug/hosts.json`; credentials resolve from environment
+references at execution time. Redirects, writes and unknown effects are refused and
+all existing time, byte, concurrency and cancellation bounds remain. Authenticated
+MCP/A2A execution is deferred.
+
+The engine verdict and a bounded workbench demonstration are reported side by side;
+neither is relabeled as an SLO. An optional critic plus Jev review can identify
+cited concerns and recommend among engine-admissible architectures. Only the author
+can adopt a design. The pin records evidence in the canonical input and is
+deterministically re-verified on every analysis; infeasible or dominated choices
+are rejected and stale pins are visibly superseded.

@@ -61,6 +61,33 @@ describe('Open Workflow Specification interchange', () => {
     );
     expect(a).not.toMatch(/^\s*[&*]\w/m);
   });
+  it('exports the declared HTTP method and path and still round-trips', () => {
+    const input = flightInput();
+    const c = input.connections[0];
+    const downstream = input.systems.find(
+      (s) => s.id === c.downstreamSystemId,
+    )!;
+    const op = downstream.operations.find(
+      (o) => o.id === c.downstreamOperationId,
+    )!;
+    const iface = downstream.interfaces.find((i) => i.id === op.interfaceId)!;
+    iface.endpoint = 'https://flights.example/api/';
+    op.metadata = { http: { method: 'get', path: '/search/{route}' } };
+    const doc = exportWorkflowSpec(input) as Record<string, any>;
+    const task = doc.do[0][c.id];
+    expect(task.call).toBe('http');
+    expect(task.with.method).toBe('get');
+    expect(task.with.endpoint).toBe(
+      'https://flights.example/api/search/{route}',
+    );
+    const back = importWorkflowSpec(workflowSpecYaml(input));
+    expect(back.lossless).toBe(true);
+    expect(
+      back.input.systems
+        .find((s) => s.id === c.downstreamSystemId)!
+        .operations.find((o) => o.id === c.downstreamOperationId)!.metadata,
+    ).toEqual({ http: { method: 'get', path: '/search/{route}' } });
+  });
   it('round-trips losslessly through YAML and JSON', () => {
     const input = flightInput();
     const design = suggestDesign(input);
@@ -189,7 +216,7 @@ describe('Open Workflow Specification interchange', () => {
       downstreamOperationId: op,
     });
   });
-  it('rejects malformed, oversized and over-capacity documents', () => {
+  it('rejects malformed documents and imports large graphs without count ceilings', () => {
     expect(() => importWorkflowSpec('do: []')).toThrow(/document/);
     expect(() =>
       importWorkflowSpec(
@@ -208,7 +235,6 @@ describe('Open Workflow Specification interchange', () => {
       ),
     ).toThrow(/no HTTP/);
     expect(() => importWorkflowSpec('x: &a 1\ny: *a\n')).toThrow();
-    expect(() => importWorkflowSpec('a'.repeat(300 * 1024))).toThrow(/256 KB/);
     const many = (n: number) =>
       stringify({
         document: { dsl: '1.0.3', namespace: 'a', name: 'b', version: '1.0.0' },
@@ -220,7 +246,7 @@ describe('Open Workflow Specification interchange', () => {
         })),
       });
     expect(importWorkflowSpec(many(7)).input.systems).toHaveLength(8);
-    expect(() => importWorkflowSpec(many(8))).toThrow(/9 systems/);
+    expect(importWorkflowSpec(many(20)).input.systems).toHaveLength(21);
     const crowded = stringify({
       document: { dsl: '1.0.3', namespace: 'a', name: 'b', version: '1.0.0' },
       do: Array.from({ length: 5 }, (_, i) => ({
@@ -230,6 +256,10 @@ describe('Open Workflow Specification interchange', () => {
         },
       })),
     });
-    expect(() => importWorkflowSpec(crowded)).toThrow(/four per system/);
+    expect(
+      importWorkflowSpec(crowded).input.systems.find(
+        (s) => s.name === 'one.example.com',
+      )?.operations,
+    ).toHaveLength(5);
   });
 });

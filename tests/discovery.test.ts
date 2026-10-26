@@ -61,6 +61,13 @@ describe('discovery requests', () => {
       Authorization: 'Bearer secret',
       'X-Api-Key': 'k',
     });
+    expect(
+      parseDiscoveryRequest({
+        protocol: 'http',
+        url: 'https://example.test/openapi.json',
+        headers: {},
+      }).protocol,
+    ).toBe('http');
     const reject = (body: unknown, message: RegExp) => {
       try {
         parseDiscoveryRequest(body);
@@ -145,6 +152,8 @@ describe('MCP discovery', () => {
       complete: true,
       notes: [],
     });
+    // The workbench's own fetch time rides along as a synthetic observation.
+    expect(found.fetchMs).toBeGreaterThanOrEqual(0);
     expect(found.protocol === 'mcp' && found.tools.map((t) => t.name)).toEqual([
       'tool_1',
       'tool_2',
@@ -408,5 +417,120 @@ describe('A2A discovery', () => {
     const missing = await failure(at('/'));
     expect(missing.status).toBe(404);
     expect(missing.message).toMatch(/No Agent Card at/);
+  });
+});
+const openApiFixtureDoc = () => ({
+  openapi: '3.1.0',
+  info: { title: 'Inventory', version: '2.0.0' },
+  servers: [{ url: 'https://inventory.example/api?x=1' }],
+  paths: {
+    '/availability/{sku}': {
+      get: {
+        operationId: 'check-availability',
+        summary: 'Availability snapshot',
+        parameters: [
+          {
+            name: 'sku',
+            in: 'path',
+            required: true,
+            schema: { type: 'string' },
+          },
+        ],
+        responses: {
+          '200': {
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: { available: { type: 'integer' } },
+                },
+              },
+            },
+          },
+        },
+      },
+      post: { operationId: 'reserve', responses: {} },
+    },
+  },
+});
+describe('OpenAPI discovery', () => {
+  it('reads one JSON document with the supplied header and drafts its operations', async () => {
+    const api = await track(
+      startRoutes({
+        '/openapi.json': {
+          json: openApiFixtureDoc(),
+          require: ['authorization', 'Bearer k3y'],
+        },
+      }),
+    );
+    const found = await discover({
+      protocol: 'http',
+      url: api.url + '/openapi.json?token=secret',
+      headers: { authorization: 'Bearer k3y' },
+    });
+    if (found.protocol !== 'http') throw new Error('Expected OpenAPI');
+    expect(found.url).toBe(`${api.origin}/openapi.json`);
+    expect(found.info).toEqual({ title: 'Inventory', version: '2.0.0' });
+    expect(found.openapiVersion).toBe('3.1.0');
+    // The server URL is resolved and kept without its query string.
+    expect(found.serverUrl).toBe('https://inventory.example/api');
+    expect(found.complete).toBe(true);
+    const ops = found.operations as {
+      id: string;
+      metadata: { http: { method: string; path: string } };
+    }[];
+    expect(ops.map((o) => o.id)).toEqual(['check-availability', 'reserve']);
+    expect(ops[0].metadata.http).toEqual({
+      method: 'get',
+      path: '/availability/{sku}',
+    });
+    expect(api.requests).toHaveLength(1);
+  });
+  it('reads YAML and defaults a missing server to the document origin', async () => {
+    const api = await track(
+      startRoutes({
+        '/spec': {
+          text: [
+            'openapi: 3.0.3',
+            'info: { title: Notes }',
+            'paths:',
+            '  /notes:',
+            '    get:',
+            '      responses: {}',
+          ].join('\n'),
+        },
+      }),
+    );
+    const found = await discover({
+      protocol: 'http',
+      url: api.url + '/spec',
+      headers: {},
+    });
+    if (found.protocol !== 'http') throw new Error('Expected OpenAPI');
+    expect(found.serverUrl).toBe(`${api.origin}/`);
+    expect(found.notes.join(' ')).toContain('names no server');
+    expect(found.operations).toHaveLength(1);
+  });
+  it('explains documents that are not OpenAPI and failed requests', async () => {
+    const api = await track(
+      startRoutes({
+        '/plain.json': { json: { hello: 'world' } },
+        '/broken': { text: '{not: [yaml' },
+        '/empty.json': { json: { openapi: '3.1.0', paths: {} } },
+        '/private.json': { status: 401 },
+      }),
+    );
+    const at = (path: string) =>
+      discover({ protocol: 'http', url: api.origin + path, headers: {} });
+    expect((await failure(at('/plain.json'))).message).toMatch(
+      /not an OpenAPI document/,
+    );
+    expect((await failure(at('/broken'))).message).toMatch(/not JSON or YAML/);
+    expect((await failure(at('/empty.json'))).message).toMatch(
+      /lists no operations/,
+    );
+    expect((await failure(at('/private.json'))).message).toMatch(
+      /refused the request \(HTTP 401\)/,
+    );
   });
 });

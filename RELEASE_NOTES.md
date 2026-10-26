@@ -1,17 +1,17 @@
 # Plug 0.2.0-alpha.1 — local workbench, multi-system inference and workflow graph
 
-Implements draft [SEP-0000: local workbench](seps/0000-local-workbench-and-multi-system.md),
-[SEP-0000: workflow graph](seps/0000-workflow-graph-and-openspec.md) and
-[SEP-0000: local MCP and A2A discovery](seps/0000-local-mcp-a2a-discovery.md). Verified
-locally on 2026-10-05 using **Node 25.9.0**; Node 24 was not available on the
-verification host, so the Node 24 run remains outstanding. Public URL: **not
+Implements the draft SEPs indexed in [seps/README.md](seps/README.md), including
+the local workbench, workflow interchange, integration probing, edge verification,
+design review and author adoption, revision history, and MCP/skill exposure.
+Verified locally on 2026-10-26 using **Node 24.22.1**. Public URL: **not
 deployed**. Release commit: **not assigned**. No production SLO or adoption claims
 are made.
 
 ## Implemented
 
-- `0.2-alpha.1` contracts: two to eight systems, one to twelve connections with their
-  own profile, workload and experience, optional goal fields and priorities,
+- `0.2-alpha.1` contracts: multi-system graphs without fixed serialized system,
+  operation or connection count ceilings, with each connection's own profile,
+  workload and experience, optional goal fields and priorities,
   `static` evidence, `WorkspaceIndex` and `PatternDefinition`. `0.1-alpha.2`
   documents migrate mechanically with equal candidate verdicts.
 - Three-valued relation engine, pattern knowledge base (six seeds, seventeen
@@ -26,8 +26,8 @@ are made.
 - Local MCP and A2A discovery in `plug ui` only: the inspector takes a server's URL
   and transient request headers, lists an MCP server's tools over Streamable HTTP
   (never calling one) or an A2A agent's skills from its Agent Card (never sending a
-  message), within time, size, page and same-origin redirect bounds, and imports up
-  to four chosen ones through the metadata importers. Headers are never stored,
+  message), within time, size, page and same-origin redirect bounds, and imports
+  the chosen ones through the metadata importers. Headers are never stored,
   logged or returned; the hosted playground never discovers.
 - Playground: workflow graph editor (systems as groups, operations as nodes,
   connections as edges with priority badges and per-edge inspector; + connectors
@@ -47,36 +47,55 @@ are made.
   foreign workflows with unknown facts and listed gaps.
 - `plug spec` and the workbench's Write spec to workspace write the `.plug/` bundle
   (`workflow.yaml`, `design-input.json`, `design.json`, `design.md`, `AGENTS.md`);
-  the workbench flags and reopens a workflow edited outside Plug.
-- `plug mcp`: stdio MCP server with `plug_get_spec`, `plug_update_spec`,
-  `plug_analyze`, `plug_index_workspace` and `plug_explain` and `plug://spec/`
-  resources; `plug mcp install` registers it in project-scoped Cursor, VS Code or
-  Claude Code configuration.
+  every write retains a content-addressed revision, and the workbench reviews
+  historical Plug or Git versions before replacement.
+- Author-disclosed exact-origin authorization, bounded safe-read probes and
+  timestamped operation manifests; as-is/design edge verification over authorized
+  HTTP, MCP Streamable HTTP and A2A JSON-RPC bindings; schema-validated ephemeral
+  request samples when examples are absent; citation-gated critic plus Jev review
+  and explicit author adoption.
+- `plug mcp`: eleven stdio tools spanning specs, indexing, add/inspect, probe,
+  verify, review, adoption and revision history, plus `plug://spec/`,
+  `plug://manifest` and `plug://verifications` resources. `plug mcp install`
+  registers it in project-scoped Cursor, VS Code or Claude Code configuration;
+  `plug skill install` installs the portable Plug workflow skill.
+- `plug setup`: an explicit post-install prompt for optional Jev and completion
+  providers, with masked secrets, ignored mode-`0600` `.env.local` storage and a
+  non-secret `--check` mode. Equivalent setup and environment-inspection APIs are
+  exported for SDK hosts; deterministic core use remains zero-configuration.
 
 ## Verified
 
 - `npm run check`: TypeScript, ESLint, formatting, generated-artifact drift,
-  examples, documentation links/SEP metadata, and **110 passing tests**, including
+  examples, documentation links/SEP metadata, and **217 passing tests**, including
   workflow interchange, an MCP client talking to `plug mcp` over stdio, and
   discovery against local MCP and A2A fixture servers: pagination, refused and
   cross-origin redirected requests, size, page and time bounds, cancellation, and
   headers that never reach the result or the workspace.
 - `npm run build`: reference package with packaged UI, declarations, schema,
   service and UI build.
-- Browser suite, development and production (`npm start`) servers: **15 passing
-  Chromium tests** each, run with `PLUG_TEST_PORT=3107` and `3111` because port 3000
-  was occupied by an unrelated process. The full-speed proof again observed real
+- Production browser suite: **25 passing Chromium tests** on
+  `PLUG_TEST_PORT=3100`. The full-speed proof observed real
   warmup, a cache hit, a changed version after the later refresh, expiry and
   cancellation. The graph tests dragged a + onto an operation and onto empty canvas,
   connected clicked operations in Add connection mode, removed operations,
   connections and every system with undo and listed draft gaps, deleted by keyboard,
   round-tripped a downloaded workflow and reviewed a foreign one. In the packaged
-  workbench they wrote and reopened an edited `.plug/workflow.yaml` and listed MCP
-  tools and A2A skills from local fixture servers without keeping headers.
+  workbench they probed a safe OpenAPI read, verified a plain-REST edge, reviewed,
+  adopted and cleared a design, restored a retained spec revision, exercised a
+  50-operation/100-connection graph, and listed MCP tools and A2A skills without
+  keeping headers.
 - `npm run test:package`: the tarball installed outside the workspace analyzed and
   executed a customized input, indexed a directory, served the workbench UI and
-  workspace endpoints, wrote the `.plug/` bundle, registered the Cursor MCP entry
-  and answered an MCP handshake from the packed `plug mcp`.
+  workspace endpoints, reported non-secret environment readiness, loaded an MCP
+  review provider from the workspace's `.env.local`, wrote the `.plug/` bundle,
+  installed the portable Plug skill, registered the Cursor MCP entry, and
+  verified all eleven tools plus the manifest and verification resources from
+  the packed `plug mcp`.
+- One live five-case review calibration had pass@1 and engine agreement 1.0 with
+  0.2 abstention; one live probe-question smoke test correctly classified useful
+  output, source timestamp and rate limiting. Both use scrubbed fixtures and are
+  evaluation evidence, not production measurements or SLOs.
 - The workbench indexed this repository in a browser and reported a stale index
   after source changes.
 
@@ -85,8 +104,7 @@ dominating `scheduled-cache-aside`) with unchanged seed estimates. Catalog
 `0.2-alpha.1/catalog-1+knowledge-1`.
 Input hash: `2e32f278a75589d75f0e6dbce30895e1c22619563a1f92e54efd87aa48aaa98d`.
 Design hash: `19667d19c6f9148485d3db4eb98bba6c41b2a228270de53b00ebce415696ba3d`.
-The initial production UI bundle is about 154 KB gzip; the graph editor and ELK
-layout load on demand as a further 510 KB gzip chunk.
+The graph editor and ELK layout remain lazy-loaded.
 
 Remaining release steps from 0.1.0-alpha.2 below still apply.
 
@@ -149,7 +167,7 @@ and reference package include the license; npm publication remains disabled.
    commit and public URL here. Free-tier cold starts remain a documented limitation.
 
 The bootstrap SEP remains draft pending actual owner review. Multi-instance
-operation, durable jobs/cache, restart continuity, authenticated MCP/A2A execution
+operation, durable jobs/cache, restart continuity, unrestricted MCP/A2A execution
 and customer endpoint execution in the hosted playground are outside this alpha.
 The local continuous runner is explicitly selected by trusted application code;
 hosted requests cannot extend the 120-second session lifetime. The production UI

@@ -20,6 +20,7 @@
     "check:docs": "tsx scripts/check-seps.ts && tsx scripts/check-docs.ts",
     "check": "tsc --noEmit && eslint . && npm run check:format && npm run check:generated && tsx scripts/validate-examples.ts && npm run check:docs && vitest run",
     "test": "vitest run",
+    "eval:review": "tsx scripts/eval-review.ts",
     "test:browser": "playwright test",
     "build": "npm run generate && vite build --config apps/playground/vite.config.ts && tsx scripts/build.ts",
     "start": "NODE_ENV=production node dist/server.js",

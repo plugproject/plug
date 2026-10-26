@@ -16,12 +16,16 @@ coding agent how to keep that shared design current.
 
 Plug is a deterministic design engine for the seams between systems — the places
 where latency gaps, overload, duplicate side effects and trust boundaries live, and
-where most production incidents are born. Describe two to eight systems and up to
-twelve connections, state the operational facts you actually know, declare the
-experience each connection must deliver — and Plug composes architectures that close
+where most production incidents are born. Describe your systems and connections,
+state the operational facts you actually know, declare the experience each
+connection must deliver — and Plug composes architectures that close
 every detected problem, ranks a Pareto frontier by your priorities, and attaches a
-proof to each result. Same input, same design, every time. No model calls, and your
-endpoints are never invoked during analysis.
+proof to each result. Same input, same design, every time. Analysis makes no model
+calls, and your endpoints are never invoked during analysis. Optional local models
+have bounded supporting roles: a completion model can draft quote-backed facts,
+ephemeral request samples or a cited design critique, while Jev answers registered
+typed semantic questions. Code validates every result, and only the author can
+adopt it. No model chooses an architecture.
 
 ```mermaid
 flowchart LR
@@ -115,6 +119,51 @@ flowchart TD
 An unknown fact is not a passing check. Proofs retain the facts and assumptions
 used, so reviewers can see what a candidate does and does not establish.
 
+## End-to-end architecture
+
+```mermaid
+flowchart LR
+    AUTHOR["Author"] --> INTAKE["Index, discover or import<br/>systems and operations"]
+    AUTHOR --> REQ["Declare each edge's<br/>business requirement"]
+    INTAKE --> SPEC["Canonical OpenSpec<br/>and DesignInput"]
+    REQ --> SPEC
+
+    AUTHOR --> AUTH["Authorize exact host origin"]
+    AUTH --> PROBE["Bounded read-safe probe harness"]
+    PROBE --> MANIFEST["Operation manifest<br/>local-workbench evidence"]
+    MANIFEST --> SPEC
+
+    SPEC --> ENGINE["Deterministic relation engine<br/>and composition planner"]
+    ENGINE --> FRONTIER["As-is verdict, Pareto frontier<br/>proofs and implementation tasks"]
+    ENGINE --> VERIFY["Bounded as-is or design<br/>verification harness"]
+    VERIFY --> RECORDS["Pinned demonstration records<br/>not production SLOs"]
+    FRONTIER --> REVIEW["Citation-gated design review"]
+    RECORDS --> REVIEW
+    REVIEW --> ADOPT["Explicit author adoption"]
+    ADOPT --> SPEC
+
+    SPEC --> HISTORY["Content-addressed revisions<br/>and read-only Git history"]
+    HISTORY -. "reviewed restore" .-> SPEC
+    SPEC <-- "validated read/update" --> MCP["Workspace-scoped Plug MCP"]
+    MCP <-- "tools and resources" --> IDE["Agentic IDE"]
+    SKILL["Packaged Plug skill"] --> IDE
+
+    DRAFTER["Completion drafter"] -. "review-only proposals" .-> INTAKE
+    DRAFTER -. "schema-validated request sample" .-> PROBE
+    DRAFTER -. "schema-validated request sample" .-> VERIFY
+    DRAFTER -. "cited critique" .-> REVIEW
+    JEV["Jev typed judgments"] -.-> PROBE
+    JEV -.-> VERIFY
+    JEV -.-> REVIEW
+```
+
+These outputs have deliberately different authority. Probes establish bounded
+facts from one authorized workbench vantage. The engine alone decides feasibility
+and composes designs. Verification records what happened in a bounded trial.
+The critic and Jev qualify a review, and the author may adopt only an
+engine-admissible architecture. Every later analysis re-verifies that adoption
+against the current facts and catalog.
+
 ## From a graph in your browser to the agent in your IDE
 
 ```sh
@@ -127,15 +176,28 @@ npx plug index . --out workspace-index.json
    package manifests and source markers that drafts your system and lists the
    operational facts Plug still needs. It skips secrets, dependencies and
    symbolic links, and the draft is used only after you review and adopt it.
-2. **Add the systems you talk to.** Paste a JSON/YAML description, import an MCP
-   `tools/list` (2025-11-25) or an A2A Agent Card (1.0) — or enter a server URL
-   and the workbench lists its tools or skills without calling them. Request
-   headers are used once and never saved.
+2. **Add and inspect the systems you talk to — index first.** A fresh system starts at its
+   URL: enter it and the workbench lists its tools (MCP 2025-11-25), skills
+   (A2A 1.0) or operations (OpenAPI) without calling them, noting its own fetch
+   time as a synthetic observation. Request headers are used once and never
+   saved. Before adding a host, the local workbench discloses that Plug may inspect
+   every exposed integration point. Choose **Add and inspect** to run bounded,
+   protocol-safe reads and create a timestamped operation manifest, or add without
+   inspecting. HTTP `GET`/`HEAD`, MCP `tools/list` and A2A Agent Card retrieval are
+   intrinsically read-safe. Any other exact operation requires the author to
+   declare both read effect and idempotency; an explicit write is never probed.
+   If an eligible request needs values but has no declared example, one configured
+   completion call may propose an ephemeral sample. Plug validates it against the
+   input schema and every template placeholder, never sends the endpoint or
+   credentials to the model, and never writes the sample into the spec. Pasting
+   JSON/YAML or raw metadata still works, and the edge inspector lists the facts
+   each connection still needs.
 3. **Draw the experience you need.** The design is a workflow graph: systems are
    groups, operations are nodes, and every edge is a connection carrying its own
    required experience and priority order. Hover an operation and drag its **+**
    onto another to connect them; create, re-parent, rename, rewire or remove
    anything at any level — fullscreen if you like — and undo restores it.
+   Large workflows gain searchable connections and designs grouped by system.
 4. **Exchange it as a standard.** Download or upload the graph as an
    [Open Workflow Specification](https://open-workflow-specification.org/)
    document instead of locking intent into a proprietary format.
@@ -147,31 +209,39 @@ npx plug index . --out workspace-index.json
    ```
 
    The agent reads the spec of record and updates it through the `plug mcp`
-   stdio server (`plug_get_spec`, `plug_update_spec`, `plug_analyze`,
-   `plug_index_workspace`, `plug_explain`), which validates and re-analyzes
-   every change. The design stops living in one person's head.
+   stdio server. Its eleven tools cover spec read/update, analysis and explanation,
+   indexing, add-and-inspect, probing, edge verification, design review and
+   adoption, and retained revision history. Spec, manifest and verification
+   resources expose the canonical state and its evidence. Every change is validated and
+   re-analyzed. The same workflow is available as the packaged Plug skill for
+   agentic IDEs.
 
 ```mermaid
 flowchart LR
-    W["Local workbench<br/>review facts + edit graph"] --> B[".plug/ workspace bundle<br/>workflow.yaml + design input<br/>design output + agent guidance"]
-    B -->|"read spec and explanation"| A["Coding agent<br/>in your IDE"]
-    A -->|"plug_update_spec"| M["Plug MCP server"]
-    M --> V["Validate + re-analyze"]
-    V -->|"updated spec and design"| B
-    classDef node fill:#f8f9f5,stroke:#b4bea5,color:#20251c;
-    classDef plug fill:#d7ef83,stroke:#91a95d,color:#20251c;
-    class W,B,A node;
-    class M,V plug;
+    REPO["Your repository"] -- "plug index ." --> WB["Local workbench<br/>plug ui"]
+    WB <-- "download / upload" --> OWS["Open Workflow<br/>Specification document"]
+    OWS -- "plug spec" --> SPEC[".plug/ spec of record<br/>input, design, guide and evidence"]
+    WB --> SPEC
+    GIT["Repository Git history"] -. "read-only log/show" .-> WB
+    SPEC <-- "plug mcp stdio<br/>validates and re-analyzes" --> AGENT["Coding agent<br/>in your IDE"]
+    SKILL["Plug skill"] --> AGENT
 ```
+
+The `.plug/` state includes the canonical workflow and generated design bundle,
+exact-origin authorizations, bounded probe logs and the latest manifest,
+verification and review JSONL records, plus at most 50 content-addressed workflow
+revisions. The workbench can review a retained Plug revision or a read-only Git
+version before replacing and writing the current workflow. Plug never adds or
+commits files to Git.
 
 MCP registration makes the design available to the IDE. The generated
 `.plug/AGENTS.md` carries instructions to read it before integration changes and
 update it afterward. Reference that guidance from the project instructions your
-agent actually loads. The current implementation registers MCP and generates
-agent guidance; it does not automatically install a separate `SKILL.md` package
-or enforce every code change.
+agent actually loads. Plug registers MCP, installs the skill and generates agent
+guidance; it does not enforce every code change.
 
-The full CLI is `plug analyze|explain|demo|index|ui|spec|mcp`.
+The full CLI is `plug analyze|explain|demo|setup|index|probe|verify|ui|spec|mcp`,
+plus `plug mcp install` and `plug skill install --ide cursor|vscode|claude|generic`.
 
 ## Run it locally
 
@@ -194,29 +264,103 @@ npm run test:browser   # npx playwright install chromium, once
 npm start              # production UI and API on port 3000 or $PORT
 ```
 
+## Environment configuration
+
+Plug's deterministic core — indexing/import, analysis, explanation, OpenSpec,
+spec history and read-only MCP operations — requires **no environment
+variables**. Credentials are required only when you enable a model-backed role,
+execute a binding whose headers reference the environment, or deploy the hosted
+playground.
+
+After installing the reference package as a dependency (currently from an
+owner-authorized tarball), run its guided post-install setup:
+
+```sh
+npx plug setup --workspace .
+npx plug setup --check --workspace .   # status only; never prints secret values
+```
+
+`plug setup` asks which optional roles to enable, masks API-key input, adds
+`.env.local` to `.gitignore` with permission, and writes that file with mode
+`0600`. It does not require a provider just to use Plug. The package exports
+`promptForPlugEnvironment` for the same terminal flow,
+`setupPlugEnvironment` for an application-supplied prompt UI, and
+`inspectPlugEnvironment`/`inspectWorkspaceEnvironment` for non-secret readiness
+checks. `plug ui`, `plug probe`, `plug verify` and `plug mcp` load the selected
+workspace's `.env.local`. Direct SDK calls keep configuration explicit through
+their provider or `env` arguments.
+
+The local model roles are conditional:
+
+- **Jev typed judgments and cross-checks:** set `TYPESAFE_API_KEY` and the exact
+  `PLUG_JUDGE_MODEL`. `PLUG_JUDGE_PROVIDER=typesafe` makes the selection
+  explicit; a TypeSafe key also selects it when no judge provider is named.
+- **Fact and request-sample drafting:** set either `ANTHROPIC_API_KEY` or
+  `OPENAI_API_KEY`, plus the exact `PLUG_DRAFT_MODEL`.
+  `PLUG_DRAFT_PROVIDER=anthropic|openai` is recommended and disambiguates when
+  both keys exist.
+- **Design critique:** by default review reuses `PLUG_DRAFT_PROVIDER` and
+  `PLUG_DRAFT_MODEL`. Set `PLUG_REVIEW_PROVIDER` and `PLUG_REVIEW_MODEL` only
+  for a separate critic; its matching Anthropic or OpenAI key is still required.
+- **Integration credentials:** a persisted header value such as
+  `${env:PARTNER_API_TOKEN}` requires `PARTNER_API_TOKEN` at probe or
+  verification time. These names are specific to the imported systems and
+  cannot be listed globally. Credential values are never written to `.plug/`.
+
+For a public hosted-playground deployment, set `APP_ORIGIN` to the exact public
+HTTPS origin. The platform may supply `PORT` (default `3000`);
+`TRUST_PROXY_HOPS` defaults to `0` and must change only after the proxy chain is
+verified. `RENDER_GIT_COMMIT` or `RELEASE_COMMIT` adds release metadata to
+`/healthz`; neither is needed locally. See the safe, value-free
+[`.env.example`](.env.example) and [deployment guide](docs/development/deployment.mdx).
+`PLUG_TEST_*`, `PLUG_WORKBENCH_*` and `CI` are test-runner controls, not runtime
+setup.
+
 ## What Plug refuses to do
 
 The guarantees are the product. Each of these is enforced in code and tests:
 
 - **Never invokes your endpoints during hosted analysis.** Hosted execution binds
-  only the bundled synthetic fixture; trusted loopback HTTP is available locally.
-- **Never fills in facts.** Unknown stays unknown, and the proofs say so.
-- **Never confuses a demo with production.** Coverage replay is synthetic,
+  only the bundled synthetic fixture. The local workbench can use explicitly
+  authorized HTTP(S), MCP Streamable HTTP and A2A JSON-RPC bindings under its
+  read-safety, call, rate, timeout, byte and cancellation bounds.
+- **Never guesses facts.** Every fact is declared, measured by a probe you
+  authorized, or unknown, and the proofs say so. A local
+  model may draft a quote-backed declaration, but only your explicit adoption
+  enters the graph.
+- **Never confuses a demo or probe with production.** Coverage replay is synthetic,
   specific to each exact policy, and assumes successful bounded calls. A warm-hit
-  point estimate is not a production p95; a few demo runs do not validate an SLO.
+  point estimate or local probe percentile is not a production p95; a few runs do
+  not validate an SLO.
 - **Never infers cache permission from annotations.** Caching is allowed only
   when you say it is.
 - **Never weakens your requirements to make a design pass.**
+- **Never guesses that two texts mean the same thing.** Semantic equivalence
+  passes on exact equality or on a recorded, author-initiated model judgment
+  pinned to the exact judged strings (`judged` evidence, local workbench only);
+  a stale or missing judgment falls back to the strict comparison.
 
 ## Scope today
 
 Manual JSON/YAML, MCP `tools/list` and A2A Agent Cards are supported for metadata
-intake; imports preserve unknown metadata and schema dialects. Schemas, mappings,
-QoS, scope and cache permission may still need author input. Composed
-architectures are design output; only seed designs run here. Global patterns
-(backend for frontend, message bus and similar) are reported as needing global
-context. No durable cache, distributed scheduler, restart recovery, OAuth sign-in
-for discovery, arbitrary expression evaluation, or model-assisted extraction.
+intake; imports preserve unknown metadata and schema dialects. The serialized graph
+has no fixed system, operation or connection count ceiling; parsing, requests,
+execution and retained history remain byte-, time- and resource-bounded. Schemas,
+mappings, QoS, scope and cache permission may still need author input. With
+configured completion and TypeSafe providers, the local workbench can draft an
+output meaning, mechanically verified mappings or an explicitly documented
+per-minute quota; every proposal requires an exact source quote and author
+adoption. A bounded critic can review a scrubbed design shortlist with
+mechanically resolved citations; Jev cross-checks the concerns and alternatives,
+and an unavailable or unsettled judgment never becomes a fact. Composed
+architectures are design output; supported seed designs can run against an
+explicitly authorized HTTP binding or HTTP-carried MCP/A2A binding when the exact
+operation is read-safe. MCP runs include bounded initialization, notification and
+session cleanup. Global patterns (backend for frontend, message bus and similar)
+are reported as needing global context. No durable cache, distributed scheduler,
+restart recovery, OAuth sign-in for discovery or arbitrary expression evaluation.
+Model-assisted intake does not infer operational measurements, workload, trust,
+cache permission or architectures.
 
 **Release status:** no public deployment or public URL has been verified.
 Plug is licensed under the [MIT License](LICENSE). npm publication remains
@@ -238,10 +382,15 @@ Plug is young, the spec is a draft, and the interesting problems are open:
   [public alpha design](seps/0000-public-alpha-design.md),
   [local workbench and multi-system inference](seps/0000-local-workbench-and-multi-system.md),
   [workflow graph and OpenSpec](seps/0000-workflow-graph-and-openspec.md),
-  [local MCP and A2A discovery](seps/0000-local-mcp-a2a-discovery.md).
+  [local MCP and A2A discovery](seps/0000-local-mcp-a2a-discovery.md),
+  [integration probing](seps/0000-integration-probing-and-measured-facts.md),
+  [edge verification](seps/0000-edge-verification-harness.md),
+  [design review and adoption](seps/0000-design-review-and-author-adoption.md),
+  [OpenSpec revisions](seps/0000-openspec-revision-history-and-git-restore.md), and
+  [agent exposure](seps/0000-agent-exposure-mcp-and-skill.md).
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) first. `npm run check`, `npm run build`
-and `npm run test:browser` keep you honest. While licensing is unresolved,
+and `npm run test:browser` keep you honest. Until npm publication opens,
 [issues and ideas](https://github.com/plugproject/plug/issues) are the best entry
 point.
 
@@ -249,6 +398,7 @@ point.
 
 - [Quickstart and custom HTTP adoption](docs/docs/quickstart.mdx)
 - [Current draft specification](docs/specification/draft/index.mdx)
+- [Architecture and runtime boundaries](docs/specification/draft/architecture.mdx)
 - [Canonical contracts](schema/draft/schema.ts) / [reference package](packages/plug/src/index.ts)
 - [Deployment](docs/development/deployment.mdx)
 - [Implementation status](IMPLEMENTATION.md)

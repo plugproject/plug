@@ -7,7 +7,9 @@ import type {
   DemoEvent,
   DesignInput,
   DesignRecommendation,
+  OperationManifest,
   SystemDescription,
+  VerificationRecord,
   WorkspaceIndex,
 } from '../../../packages/plug/src/contracts/index';
 import {
@@ -22,12 +24,12 @@ import {
   workflowSpecYaml,
 } from '../../../packages/plug/src/openspec/index';
 import { Inspector } from './workflow/Inspector';
+import { DesignReview } from './workflow/DesignReview';
 import type { Focus } from './workflow/model';
 import {
   addConnection,
   blankSystem,
   draftGaps,
-  limits,
   reconnect,
   removeElement,
   retarget,
@@ -39,6 +41,19 @@ interface SpecStatus {
   consistent: boolean;
   workflowEdited: boolean;
   problems: string[];
+  summary?: { revisionId: string } | null;
+  git?: GitHistory | null;
+}
+interface SpecRevision {
+  id: string;
+  at: string;
+  source: string;
+  changedPaths: string[];
+}
+interface GitHistory {
+  tracked: boolean;
+  ignored: boolean;
+  commits: { sha: string; at: string; subject: string }[];
 }
 interface WorkspaceState {
   workspace: string;
@@ -46,6 +61,10 @@ interface WorkspaceState {
   fresh: boolean | null;
   index: WorkspaceIndex | null;
   spec?: SpecStatus;
+}
+interface RevisionState {
+  revisions: SpecRevision[];
+  git: GitHistory | null;
 }
 const historyLimit = 50;
 /** Fields whose own undo applies, and whose consecutive edits are one history step. */
@@ -59,6 +78,15 @@ const textEntry = (el: EventTarget | null) =>
 const readable = (s: string) => s.replaceAll('_', ' ').replaceAll('-', ' ');
 const num = (v: number | null, unit = '') =>
   v === null ? 'Unknown' : `${Number(v.toFixed(3)).toLocaleString()}${unit}`;
+const originOf = (endpoint: string | null | undefined) => {
+  if (!endpoint) return null;
+  try {
+    const url = new URL(endpoint);
+    return ['http:', 'https:'].includes(url.protocol) ? url.origin : null;
+  } catch {
+    return null;
+  }
+};
 function download(name: string, text: string, type = 'application/json') {
   const url = URL.createObjectURL(new Blob([text], { type }));
   const a = document.createElement('a');
@@ -66,6 +94,38 @@ function download(name: string, text: string, type = 'application/json') {
   a.download = name;
   a.click();
   URL.revokeObjectURL(url);
+}
+async function readNdjson(
+  response: Response,
+  onValue?: (value: Record<string, unknown>) => void,
+) {
+  if (!response.ok || !response.body) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(
+      data.error ?? `Request failed with HTTP ${response.status}.`,
+    );
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let pending = '';
+  let last: Record<string, unknown> = {};
+  for (;;) {
+    const part = await reader.read();
+    pending += decoder.decode(part.value ?? new Uint8Array(), {
+      stream: !part.done,
+    });
+    const lines = pending.split('\n');
+    pending = lines.pop() ?? '';
+    for (const line of lines) {
+      if (!line) continue;
+      last = JSON.parse(line);
+      onValue?.(last);
+      if (last.type === 'error')
+        throw new Error(String(last.error ?? 'Request failed.'));
+    }
+    if (part.done) break;
+  }
+  return last;
 }
 function App() {
   const [input, setInput] = useState<DesignInput | null>(null),
@@ -77,7 +137,9 @@ function App() {
     [busy, setBusy] = useState(false),
     [json, setJson] = useState(''),
     [importText, setImportText] = useState(''),
-    [importKind, setImportKind] = useState<'mcp' | 'a2a' | 'manual'>('mcp'),
+    [importKind, setImportKind] = useState<
+      'mcp' | 'a2a' | 'openapi' | 'manual'
+    >('mcp'),
     [review, setReview] = useState<ReturnType<typeof importDescription> | null>(
       null,
     ),
@@ -100,7 +162,22 @@ function App() {
     [linking, setLinking] = useState(false),
     [canvasNote, setCanvasNote] = useState<{ text: string; n: number } | null>(
       null,
-    );
+    ),
+    [connectionQuery, setConnectionQuery] = useState(''),
+    [manifests, setManifests] = useState<OperationManifest[]>([]),
+    [authorizedOrigins, setAuthorizedOrigins] = useState<string[]>([]),
+    [probing, setProbing] = useState(''),
+    [hostDisclosure, setHostDisclosure] = useState<{
+      systemId: string;
+      name: string;
+      /** A host addition is not applied until the author accepts this dialog. */
+      next?: DesignInput;
+      focus?: Focus;
+      active?: number;
+    } | null>(null),
+    [verification, setVerification] = useState<VerificationRecord | null>(null),
+    [verifying, setVerifying] = useState<'as-is' | 'design' | null>(null),
+    [revisions, setRevisions] = useState<RevisionState | null>(null);
   const controller = useRef<AbortController | null>(null),
     session = useRef<{ id: string; token: string } | null>(null),
     typing = useRef<EventTarget | null>(null),
@@ -122,6 +199,20 @@ function App() {
           ? setWorkspace(await r.json())
           : null,
       )
+      .catch(() => null);
+    void fetch('/api/probe')
+      .then(async (response) => {
+        if (response.ok) {
+          const data = await response.json();
+          setManifests(data.operations ?? []);
+          setAuthorizedOrigins(data.authorizedOrigins ?? []);
+        }
+      })
+      .catch(() => null);
+    void fetch('/api/workspace/spec/revisions')
+      .then(async (response) => {
+        if (response.ok) setRevisions(await response.json());
+      })
       .catch(() => null);
     // Typing in a field again after leaving it starts a new history step.
     const leave = () => {
@@ -273,22 +364,44 @@ function App() {
     to: { systemId: string; operationId: string },
   ) {
     if (!input) return;
-    let id = '';
-    edit((d) => {
-      id = addConnection(d, from, to, template(input));
+    const next = structuredClone(input);
+    const id = addConnection(next, from, to, template(input));
+    replace(next);
+    setActive(input.connections.length);
+    setFocus({ kind: 'connection', id });
+    const downstream = next.systems.find((system) => system.id === to.systemId);
+    const alreadyAuthorized = downstream?.interfaces.some((iface) => {
+      const origin = originOf(iface.endpoint);
+      return origin !== null && authorizedOrigins.includes(origin);
     });
-    if (id) {
-      setActive(input.connections.length);
-      setFocus({ kind: 'connection', id });
-    }
+    if (workspace && alreadyAuthorized)
+      void probeSystem(to.systemId, true, false, next, false);
   }
   function rewire(
     connectionId: string,
     from: { systemId: string; operationId: string },
     to: { systemId: string; operationId: string },
   ) {
-    edit((d) => reconnect(d, connectionId, from, to));
-    focusOn({ kind: 'connection', id: connectionId });
+    if (!input) return;
+    const next = structuredClone(input);
+    reconnect(next, connectionId, from, to);
+    replace(next);
+    setActive(
+      Math.max(
+        0,
+        next.connections.findIndex(
+          (connection) => connection.id === connectionId,
+        ),
+      ),
+    );
+    setFocus({ kind: 'connection', id: connectionId });
+    const downstream = next.systems.find((system) => system.id === to.systemId);
+    const alreadyAuthorized = downstream?.interfaces.some((iface) => {
+      const origin = originOf(iface.endpoint);
+      return origin !== null && authorizedOrigins.includes(origin);
+    });
+    if (workspace && alreadyAuthorized)
+      void probeSystem(to.systemId, true, false, next, false);
   }
   /** Removes anything; operations and systems take their connections with them. */
   function remove(f: Focus) {
@@ -349,43 +462,58 @@ function App() {
       'system',
       input.systems.map((s) => s.id),
     );
-    edit((d) => {
-      if (d.systems.length >= limits.systems)
-        throw new Error('Eight systems is the alpha limit.');
-      d.systems.push(blankSystem(id));
-    });
-    setFocus({ kind: 'system', systemId: id });
+    const next = structuredClone(input);
+    next.systems.push(blankSystem(id));
+    const nextFocus: Focus = { kind: 'system', systemId: id };
+    if (workspace)
+      setHostDisclosure({
+        systemId: id,
+        name: 'New system',
+        next,
+        focus: nextFocus,
+      });
+    else {
+      replace(next);
+      setFocus(nextFocus);
+    }
   }
   function addSystemConnected(
     at: { systemId: string; operationId: string },
     as: 'caller' | 'downstream',
   ) {
     if (!input) return;
-    let id = '';
-    edit((d) => {
-      if (d.systems.length >= limits.systems)
-        throw new Error('Eight systems is the alpha limit.');
-      const system = blankSystem(
-        uniqueId(
-          'system',
-          d.systems.map((s) => s.id),
-        ),
-      );
-      d.systems.push(system);
-      const mine = {
+    const next = structuredClone(input);
+    const system = blankSystem(
+      uniqueId(
+        'system',
+        next.systems.map((s) => s.id),
+      ),
+    );
+    next.systems.push(system);
+    const mine = {
+      systemId: system.id,
+      operationId: system.operations[0].id,
+    };
+    const id = addConnection(
+      next,
+      as === 'caller' ? mine : at,
+      as === 'caller' ? at : mine,
+      template(input),
+    );
+    const nextActive = input.connections.length;
+    const nextFocus: Focus = { kind: 'connection', id };
+    if (workspace)
+      setHostDisclosure({
         systemId: system.id,
-        operationId: system.operations[0].id,
-      };
-      id = addConnection(
-        d,
-        as === 'caller' ? mine : at,
-        as === 'caller' ? at : mine,
-        template(input),
-      );
-    });
-    if (id) {
-      setActive(input.connections.length);
-      setFocus({ kind: 'connection', id });
+        name: 'New system',
+        next,
+        focus: nextFocus,
+        active: nextActive,
+      });
+    else {
+      replace(next);
+      setActive(nextActive);
+      setFocus(nextFocus);
     }
   }
   async function readSpecFile(file: File) {
@@ -393,7 +521,7 @@ function App() {
     setSpecNote('');
     try {
       if (file.size > workflowLimits.bytes)
-        throw new Error('Workflow documents are limited to 256 KB.');
+        throw new Error('Workflow documents are limited to 64 MB.');
       setSpecReview({
         ...importWorkflowSpec(await file.text()),
         source: file.name,
@@ -467,50 +595,232 @@ function App() {
       setWritingSpec(false);
     }
   }
+  async function refreshLocalState() {
+    const [workspaceResponse, revisionsResponse] = await Promise.all([
+      fetch('/api/workspace'),
+      fetch('/api/workspace/spec/revisions'),
+    ]);
+    if (workspaceResponse.ok) setWorkspace(await workspaceResponse.json());
+    if (revisionsResponse.ok) setRevisions(await revisionsResponse.json());
+  }
+  async function probeSystem(
+    systemId: string,
+    inspectNow: boolean,
+    authorize = true,
+    source = input,
+    recordHistory = true,
+  ) {
+    if (!source || !workspace) return;
+    setProbing(systemId);
+    setError('');
+    const rememberAuthorization = () => {
+      if (!authorize) return;
+      const origins = source.systems
+        .find((system) => system.id === systemId)
+        ?.interfaces.map((iface) => originOf(iface.endpoint))
+        .filter((origin): origin is string => origin !== null);
+      if (origins?.length)
+        setAuthorizedOrigins((current) => [
+          ...new Set([...current, ...origins]),
+        ]);
+    };
+    try {
+      const response = await fetch('/api/probe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          input: source,
+          systemId,
+          authorize,
+          inspect: inspectNow,
+        }),
+      });
+      if (!inspectNow) {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error);
+        rememberAuthorization();
+        setSpecNote(
+          'Host added without inspection. Its exposed endpoints are authorized for an explicit later inspection.',
+        );
+        return;
+      }
+      const summary = await readNdjson(response);
+      rememberAuthorization();
+      const next = summary.input ? validateInput(summary.input) : null;
+      if (next) {
+        if (recordHistory) replace(next, false);
+        else show(next);
+      }
+      if (Array.isArray(summary.manifests))
+        setManifests((current) => {
+          const merged = new Map(
+            current.map((manifest) => [
+              `${manifest.systemId}/${manifest.operationId}`,
+              manifest,
+            ]),
+          );
+          for (const manifest of summary.manifests as OperationManifest[])
+            merged.set(
+              `${manifest.systemId}/${manifest.operationId}`,
+              manifest,
+            );
+          return [...merged.values()];
+        });
+      setSpecNote(
+        'Inspection complete. Measurements are from this local workbench, not production behavior or an SLO.',
+      );
+      await refreshLocalState();
+    } catch (problem) {
+      setError((problem as Error).message);
+    } finally {
+      setProbing('');
+      setHostDisclosure(null);
+    }
+  }
+  async function verifyCurrent(mode: 'as-is' | 'design') {
+    if (!input || !conn || !workspace) return;
+    setVerifying(mode);
+    setError('');
+    try {
+      const response = await fetch('/api/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          input,
+          connectionId: conn.id,
+          mode,
+          revisionId: workspace.spec?.summary?.revisionId,
+        }),
+      });
+      const last = await readNdjson(response);
+      if (last.type !== 'verification' || !last.record)
+        throw new Error('Verification returned no record.');
+      setVerification(last.record as VerificationRecord);
+    } catch (problem) {
+      setError((problem as Error).message);
+    } finally {
+      setVerifying(null);
+    }
+  }
+  async function adoptArchitecture(
+    architectureId: string,
+    patterns: string[],
+    reviewHash?: string,
+  ) {
+    if (!input || !conn || !workspace) return;
+    const response = await fetch('/api/adopt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        input,
+        connectionId: conn.id,
+        architectureId,
+        patterns,
+        ...(reviewHash ? { reviewHash } : {}),
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error ?? 'Adoption failed.');
+    setInput(data.input);
+    setJson(JSON.stringify(data.input, null, 2));
+    setReport(data.design);
+    setMarkdown(data.markdown);
+    setStale(false);
+    setSpecNote(`Adopted ${architectureId} and wrote a new OpenSpec revision.`);
+    await refreshLocalState();
+  }
+  async function clearArchitecture() {
+    if (!input || !conn || !workspace) return;
+    const response = await fetch('/api/adopt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        input,
+        connectionId: conn.id,
+        clear: true,
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok)
+      throw new Error(data.error ?? 'Clearing adoption failed.');
+    setInput(data.input);
+    setJson(JSON.stringify(data.input, null, 2));
+    setReport(data.design);
+    setMarkdown(data.markdown);
+    setStale(false);
+    setSpecNote(
+      'Cleared the author adoption and restored the engine selection.',
+    );
+    await refreshLocalState();
+  }
+  async function openStoredSpec(
+    query: { revision?: string; commit?: string },
+    source: string,
+  ) {
+    setError('');
+    try {
+      const params = new URLSearchParams(query);
+      const response = await fetch(`/api/workspace/spec?${params}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      setSpecReview({
+        ...importWorkflowSpec(data.workflow),
+        source,
+      });
+    } catch (problem) {
+      setError((problem as Error).message);
+    }
+  }
   function adoptSystem(
     system: SystemDescription,
     as: 'caller' | 'downstream' | 'add',
   ) {
-    edit((d) => {
-      const i = Math.min(active, d.connections.length - 1);
-      const c = d.connections[i] as Connection | undefined;
-      // Without a connection there is nothing to replace, so the system is added.
-      const replacing = !c
-        ? null
-        : as === 'caller'
-          ? c.callerSystemId
-          : as === 'downstream'
-            ? c.downstreamSystemId
-            : null;
-      const shared =
-        replacing !== null &&
-        d.connections.some(
-          (x, j) =>
-            j !== i &&
-            (x.callerSystemId === replacing ||
-              x.downstreamSystemId === replacing),
-        );
-      const next = structuredClone(system);
-      next.id = uniqueId(
-        next.id,
-        d.systems.filter((s) => s.id !== replacing || shared).map((s) => s.id),
+    if (!input) return;
+    const draft = structuredClone(input);
+    const i = Math.min(active, draft.connections.length - 1);
+    const c = draft.connections[i] as Connection | undefined;
+    // Without a connection there is nothing to replace, so the system is added.
+    const replacing = !c
+      ? null
+      : as === 'caller'
+        ? c.callerSystemId
+        : as === 'downstream'
+          ? c.downstreamSystemId
+          : null;
+    const shared =
+      replacing !== null &&
+      draft.connections.some(
+        (candidate, index) =>
+          index !== i &&
+          (candidate.callerSystemId === replacing ||
+            candidate.downstreamSystemId === replacing),
       );
-      if (replacing === null || shared) {
-        if (d.systems.length >= limits.systems)
-          throw new Error(
-            'Eight systems is the alpha limit; remove one first.',
-          );
-        d.systems.push(next);
-      } else d.systems[d.systems.findIndex((s) => s.id === replacing)] = next;
-      if (!c) return;
-      if (as === 'caller') {
-        c.callerSystemId = next.id;
-        c.callerOperationId = next.operations[0].id;
-        c.inputMapping = [];
-        c.outputMapping = [];
-      } else if (as === 'downstream')
-        retarget(c, next.id, next.operations[0].id);
-    });
+    const nextSystem = structuredClone(system);
+    nextSystem.id = uniqueId(
+      nextSystem.id,
+      draft.systems
+        .filter((candidate) => candidate.id !== replacing || shared)
+        .map((candidate) => candidate.id),
+    );
+    if (replacing === null || shared) draft.systems.push(nextSystem);
+    else
+      draft.systems[
+        draft.systems.findIndex((candidate) => candidate.id === replacing)
+      ] = nextSystem;
+    if (c && as === 'caller') {
+      c.callerSystemId = nextSystem.id;
+      c.callerOperationId = nextSystem.operations[0].id;
+      c.inputMapping = [];
+      c.outputMapping = [];
+    } else if (c && as === 'downstream')
+      retarget(c, nextSystem.id, nextSystem.operations[0].id);
+    if (workspace)
+      setHostDisclosure({
+        systemId: nextSystem.id,
+        name: system.name,
+        next: draft,
+      });
+    else replace(draft);
   }
   async function indexProject() {
     setIndexing(true);
@@ -668,7 +978,37 @@ function App() {
     : undefined;
   const candidate = cr?.candidates.find((c) => c.id === selection),
     running = ['running', 'connecting'].includes(demoState);
+  const currentVerification =
+    verification &&
+    verification.connectionId === conn?.id &&
+    verification.designHash === report?.designHash
+      ? verification
+      : null;
   const systemById = (id: string) => input.systems.find((s) => s.id === id)!;
+  const visibleConnections = input.connections
+    .map((connection, index) => ({ connection, index }))
+    .filter(({ connection }) => {
+      const query = connectionQuery.trim().toLowerCase();
+      return (
+        !query ||
+        [
+          connection.id,
+          systemById(connection.callerSystemId).name,
+          systemById(connection.downstreamSystemId).name,
+        ]
+          .join(' ')
+          .toLowerCase()
+          .includes(query)
+      );
+    });
+  const designGroups = input.systems
+    .map((system) => ({
+      system,
+      connections: input.connections
+        .map((connection, index) => ({ connection, index }))
+        .filter(({ connection }) => connection.callerSystemId === system.id),
+    }))
+    .filter((group) => group.connections.length > 0);
   const exists = (f: Focus | null): f is Focus =>
     !!f &&
     (f.kind === 'connection'
@@ -718,15 +1058,81 @@ function App() {
           <a href="#try">Try</a>
         </nav>
       </header>
+      {hostDisclosure && (
+        <div className="modal-backdrop">
+          <section
+            className="modal-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="host-disclosure-title"
+          >
+            <h2 id="host-disclosure-title">Add integration host?</h2>
+            <p>
+              Adding <strong>{hostDisclosure.name}</strong> authorizes Plug to
+              inspect everything it exposes. Automatic calls are limited to
+              protocol-safe reads; write operations are never automatically
+              probed.
+            </p>
+            <p className="small">
+              Measurements describe this local workbench vantage, not production
+              behavior or an SLO. Cache permission remains author-declared.
+            </p>
+            <div className="modal-actions">
+              <button
+                className="dark"
+                disabled={!!probing}
+                onClick={() => {
+                  const pending = hostDisclosure;
+                  if (pending.next) {
+                    replace(pending.next, false);
+                    if (pending.focus) setFocus(pending.focus);
+                    if (pending.active !== undefined) setActive(pending.active);
+                  }
+                  void probeSystem(
+                    pending.systemId,
+                    true,
+                    true,
+                    pending.next ?? input,
+                    !pending.next,
+                  );
+                }}
+              >
+                {probing ? 'Inspecting…' : 'Add and inspect'}
+              </button>
+              <button
+                disabled={!!probing}
+                onClick={() => {
+                  const pending = hostDisclosure;
+                  if (pending.next) {
+                    replace(pending.next, false);
+                    if (pending.focus) setFocus(pending.focus);
+                    if (pending.active !== undefined) setActive(pending.active);
+                  }
+                  void probeSystem(
+                    pending.systemId,
+                    false,
+                    true,
+                    pending.next ?? input,
+                    !pending.next,
+                  );
+                }}
+              >
+                Add without inspecting
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
       <main>
         <section className="intro">
           <div>
             <h1>Design workbench</h1>
             <p>
-              Describe up to eight systems and the experience each connection
-              must meet. Plug derives relation facts, evaluates six seed designs
-              and composes architectures ranked by your priorities, each with
-              its proof. Analysis is deterministic and never calls an endpoint.
+              Describe systems and the experience each connection must meet.
+              Plug derives relation facts, evaluates six seed designs and
+              composes architectures ranked by your priorities, each with its
+              proof. Analysis is deterministic; only explicit local inspection
+              and verification call authorized read endpoints.
             </p>
           </div>
           <button className="text-button" onClick={() => void reset()}>
@@ -768,7 +1174,7 @@ function App() {
                 indexing={indexing}
                 onReindex={() => void indexProject()}
                 onAdopt={(as) => adoptSystem(workspace.index!.system!, as)}
-                canAdd={input.systems.length < limits.systems}
+                canAdd
               />
             )}
           </section>
@@ -796,8 +1202,8 @@ function App() {
                   system anywhere to arrange the canvas; it stays where you put
                   it through later edits until ↺ Re-layout. × removes anything,
                   with the connections it takes part in; undo brings it back.
-                  For MCP and A2A systems, enter the server in the inspector to
-                  list its tools or skills.
+                  Enter a system&apos;s server or OpenAPI document in the
+                  inspector to list its tools, skills or operations.
                 </p>
               </details>
             </div>
@@ -811,22 +1217,12 @@ function App() {
             aria-label={full ? 'Workflow editor' : undefined}
           >
             <div className="workflow-toolbar">
-              <button
-                disabled={input.systems.length >= limits.systems}
-                onClick={addSystem}
-              >
-                + Add system
-              </button>
+              <button onClick={addSystem}>+ Add system</button>
               <button
                 className="mode-button"
                 aria-pressed={linking}
-                disabled={
-                  !linking && input.connections.length >= limits.connections
-                }
                 title={
-                  !linking && input.connections.length >= limits.connections
-                    ? 'Twelve connections is the alpha limit.'
-                    : 'Click the calling operation, then the operation it calls; Esc cancels'
+                  'Click the calling operation, then the operation it calls; Esc cancels'
                 }
                 onClick={() => setLinking(!linking)}
               >
@@ -851,8 +1247,8 @@ function App() {
                 ↷
               </button>
               <span className="small">
-                {input.systems.length} of {limits.systems} systems ·{' '}
-                {input.connections.length} of {limits.connections} connections
+                {input.systems.length} systems · {input.connections.length}{' '}
+                {input.connections.length === 1 ? 'connection' : 'connections'}
               </span>
               <span className="toolbar-spacer" />
               <label className="button file-button">
@@ -916,6 +1312,73 @@ function App() {
                 here, then write the spec to re-analyze and record it.
               </p>
             )}
+            {workspace && revisions && (
+              <details className="spec-history">
+                <summary>Spec history</summary>
+                {revisions.git?.ignored && (
+                  <p className="notice">
+                    .plug/workflow.yaml is ignored by Git. Plug still keeps up
+                    to 50 local revisions; it never stages or commits files.
+                  </p>
+                )}
+                <h3>Plug revisions</h3>
+                {revisions.revisions.length ? (
+                  <ul>
+                    {revisions.revisions.map((revision) => (
+                      <li key={revision.id}>
+                        <button
+                          className="text-button"
+                          onClick={() =>
+                            void openStoredSpec(
+                              { revision: revision.id },
+                              `Plug revision ${revision.id.slice(0, 12)}`,
+                            )
+                          }
+                        >
+                          {revision.id.slice(0, 12)}
+                        </button>{' '}
+                        {revision.source} ·{' '}
+                        {new Date(revision.at).toLocaleString()}
+                        {revision.changedPaths.length > 0 && (
+                          <small>
+                            {revision.changedPaths.slice(0, 4).join(', ')}
+                          </small>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="small">No retained revision yet.</p>
+                )}
+                {revisions.git?.commits.length ? (
+                  <>
+                    <h3>Git history</h3>
+                    <ul>
+                      {revisions.git.commits.map((commit) => (
+                        <li key={commit.sha}>
+                          <button
+                            className="text-button"
+                            onClick={() =>
+                              void openStoredSpec(
+                                { commit: commit.sha },
+                                `Git ${commit.sha.slice(0, 12)}`,
+                              )
+                            }
+                          >
+                            {commit.sha.slice(0, 12)}
+                          </button>{' '}
+                          {commit.subject}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : null}
+                <p className="small">
+                  Opening a revision enters the review region below. Choose
+                  Replace workflow, then Write spec to workspace to restore it.
+                </p>
+              </details>
+            )}
             {specNote && (
               <p className="notice" role="status">
                 {specNote}
@@ -953,12 +1416,23 @@ function App() {
                 </button>
               </div>
             )}
+            {input.connections.length > 12 && (
+              <label className="connection-search">
+                Find a connection
+                <input
+                  type="search"
+                  value={connectionQuery}
+                  onChange={(event) => setConnectionQuery(event.target.value)}
+                  placeholder="Connection or system name"
+                />
+              </label>
+            )}
             <div
               className="connection-tabs"
               role="tablist"
               aria-label="Connections"
             >
-              {input.connections.map((c, i) => (
+              {visibleConnections.map(({ connection: c, index: i }) => (
                 <button
                   key={c.id}
                   role="tab"
@@ -1024,18 +1498,96 @@ function App() {
                 edit={edit}
                 onFocus={focusOn}
                 onRemove={remove}
+                onHostAdded={(systemId, name) =>
+                  setHostDisclosure({ systemId, name })
+                }
               />
             </div>
+            {workspace && (
+              <section className="manifest-panel" aria-label="Probe manifest">
+                <div className="section-heading compact">
+                  <div>
+                    <h3>Integration manifest</h3>
+                    <p>
+                      Authorized local-workbench observations, never production
+                      measurements or SLOs.
+                    </p>
+                  </div>
+                </div>
+                {manifests.length === 0 ? (
+                  <p className="small">
+                    No operation has been inspected from this workbench yet.
+                  </p>
+                ) : (
+                  <div className="manifest-grid">
+                    {manifests.map((manifest) => {
+                      const related = input.connections.filter(
+                        (connection) =>
+                          connection.downstreamSystemId === manifest.systemId &&
+                          connection.downstreamOperationId ===
+                            manifest.operationId,
+                      );
+                      const conflict = related.some((connection) =>
+                        [
+                          connection.profile.latencyMs,
+                          connection.profile.responseBytes,
+                          connection.profile.availability,
+                        ].some(
+                          (fact) =>
+                            fact?.evidence.kind === 'probed' &&
+                            fact.evidence.note.includes('Previous value:') &&
+                            !fact.evidence.note.includes('"kind":"unknown"'),
+                        ),
+                      );
+                      return (
+                        <article key={manifest.manifestHash}>
+                          <strong>
+                            {manifest.systemId} / {manifest.operationId}
+                          </strong>
+                          {conflict && (
+                            <span className="tag conflict">
+                              prior fact replaced
+                            </span>
+                          )}
+                          <small>
+                            {manifest.vantage.kind} · {manifest.sampleSize}{' '}
+                            samples · {manifest.windowMs} ms window
+                          </small>
+                          <small>
+                            p95 {manifest.latencyMs.p95 ?? 'unknown'} ms ·
+                            availability{' '}
+                            {manifest.availability === null
+                              ? 'unknown'
+                              : `${(manifest.availability * 100).toFixed(1)}%`}
+                          </small>
+                          <button
+                            disabled={!!probing}
+                            onClick={() =>
+                              void probeSystem(manifest.systemId, true, false)
+                            }
+                          >
+                            {probing === manifest.systemId
+                              ? 'Inspecting…'
+                              : 'Re-inspect'}
+                          </button>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            )}
           </div>
           <details>
-            <summary>Import MCP / A2A metadata</summary>
+            <summary>Import MCP / A2A / OpenAPI metadata</summary>
             <p className="small">
               Paste or upload metadata for review; nothing here contacts a
               server or calls a tool. MCP needs a wrapper with serverId,
               protocolVersion, and response (or ordered pages). A2A 1.0 Agent
-              Cards import skills; contracts remain gaps.{' '}
+              Cards import skills; contracts remain gaps. OpenAPI documents
+              import operations with their inline schemas.{' '}
               {workspace
-                ? 'To list a running server instead, select an MCP or A2A system and enter its details in the inspector.'
+                ? 'To list a running server instead, select a system and enter its server details in the inspector.'
                 : 'Listing a running server needs the local workbench (npx plug ui).'}
             </p>
             <div className="fields">
@@ -1050,6 +1602,7 @@ function App() {
                 >
                   <option value="mcp">MCP tools/list</option>
                   <option value="a2a">A2A Agent Card</option>
+                  <option value="openapi">OpenAPI document</option>
                   <option value="manual">Plug system description</option>
                 </select>
               </label>
@@ -1061,8 +1614,11 @@ function App() {
                   onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
-                    if (file.size > 262144) {
-                      setError('Description exceeds 256 KB');
+                    const maximum = workspace ? workflowLimits.bytes : 262144;
+                    if (file.size > maximum) {
+                      setError(
+                        `Description exceeds ${workspace ? '64 MB' : '256 KB'}`,
+                      );
                       return;
                     }
                     setImportText(await file.text());
@@ -1115,10 +1671,7 @@ function App() {
                 >
                   Use as downstream system
                 </button>
-                <button
-                  disabled={input.systems.length >= limits.systems}
-                  onClick={() => adoptSystem(review.system, 'add')}
-                >
+                <button onClick={() => adoptSystem(review.system, 'add')}>
                   Add as another system
                 </button>
               </div>
@@ -1205,26 +1758,112 @@ function App() {
               {changeNote && <p className="notice">{changeNote}</p>}
               {report.connections.length > 1 && (
                 <div
-                  className="connection-tabs"
+                  className={
+                    report.connections.length > 12
+                      ? 'design-groups'
+                      : 'connection-tabs'
+                  }
                   role="group"
                   aria-label="Connection results"
                 >
-                  {report.connections.map((r, i) => (
-                    <button
-                      key={r.connectionId}
-                      className={
-                        r.connectionId === cr.connectionId
-                          ? 'candidate active'
-                          : 'candidate'
-                      }
-                      onClick={() => selectConnection(i)}
-                    >
-                      <strong>{r.connectionId}</strong>
-                      <small>
-                        {r.selectedArchitectureId ?? 'No feasible design'}
-                      </small>
-                    </button>
-                  ))}
+                  {report.connections.length > 12
+                    ? designGroups.map((group) => (
+                        <details key={group.system.id} open>
+                          <summary>
+                            {group.system.name} · {group.connections.length}
+                          </summary>
+                          <div className="connection-tabs">
+                            {group.connections.map(({ connection, index }) => {
+                              const result = report.connections.find(
+                                (candidate) =>
+                                  candidate.connectionId === connection.id,
+                              )!;
+                              return (
+                                <button
+                                  key={result.connectionId}
+                                  className={
+                                    result.connectionId === cr.connectionId
+                                      ? 'candidate active'
+                                      : 'candidate'
+                                  }
+                                  onClick={() => selectConnection(index)}
+                                >
+                                  <strong>{result.connectionId}</strong>
+                                  <small>
+                                    {result.selectedArchitectureId ??
+                                      'No feasible design'}
+                                  </small>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </details>
+                      ))
+                    : report.connections.map((result, index) => (
+                        <button
+                          key={result.connectionId}
+                          className={
+                            result.connectionId === cr.connectionId
+                              ? 'candidate active'
+                              : 'candidate'
+                          }
+                          onClick={() => selectConnection(index)}
+                        >
+                          <strong>{result.connectionId}</strong>
+                          <small>
+                            {result.selectedArchitectureId ??
+                              'No feasible design'}
+                          </small>
+                        </button>
+                      ))}
+                </div>
+              )}
+              <div className="verdict-comparison">
+                <article>
+                  <span className="tag">Engine verdict</span>
+                  <strong>
+                    {cr.candidates.find((item) => item.id === 'direct')
+                      ?.status === 'feasible_under_declared_assumptions'
+                      ? 'Achievable as-is'
+                      : cr.selectedArchitectureId
+                        ? 'Needs a design'
+                        : 'Not established'}
+                  </strong>
+                  <small>
+                    Deterministic evaluation of declared and probed facts.
+                  </small>
+                </article>
+                <article>
+                  <span className="tag">Demonstration</span>
+                  <strong>
+                    {currentVerification
+                      ? readable(currentVerification.verdict)
+                      : 'Not run'}
+                  </strong>
+                  <small>
+                    Workbench vantage only; this is not a production SLO.
+                  </small>
+                </article>
+              </div>
+              {workspace && (
+                <div className="demo-toolbar verify-toolbar">
+                  <button
+                    disabled={!!verifying || stale}
+                    onClick={() => void verifyCurrent('as-is')}
+                  >
+                    {verifying === 'as-is' ? 'Verifying…' : 'Verify as-is'}
+                  </button>
+                  <button
+                    className="dark"
+                    disabled={
+                      !!verifying || stale || !cr.selectedArchitectureId
+                    }
+                    onClick={() => void verifyCurrent('design')}
+                  >
+                    {verifying === 'design'
+                      ? 'Verifying…'
+                      : 'Verify selected design'}
+                  </button>
                 </div>
               )}
               <p className="outcome">
@@ -1239,7 +1878,31 @@ function App() {
                   explicitly.
                 </p>
               )}
-              <Frontier report={cr} />
+              <Frontier
+                report={cr}
+                local={!!workspace}
+                onAdopt={(architectureId, patterns) =>
+                  void adoptArchitecture(architectureId, patterns).catch(
+                    (problem) => setError((problem as Error).message),
+                  )
+                }
+                onClear={() =>
+                  void clearArchitecture().catch((problem) =>
+                    setError((problem as Error).message),
+                  )
+                }
+              />
+              {workspace && (
+                <DesignReview
+                  input={input}
+                  design={report}
+                  report={cr}
+                  revisionId={workspace.spec?.summary?.revisionId ?? null}
+                  onAdopt={(architectureId, patterns, reviewHash) =>
+                    adoptArchitecture(architectureId, patterns, reviewHash)
+                  }
+                />
+              )}
               {report.crossConnection.length > 0 && (
                 <div className="cross-connection">
                   <h3>Cross-connection checks</h3>
@@ -1493,7 +2156,17 @@ function App() {
   );
 }
 const tri = (v: boolean | null) => (v === null ? 'unknown' : v ? 'yes' : 'no');
-function Frontier({ report }: { report: ConnectionReport }) {
+function Frontier({
+  report,
+  local,
+  onAdopt,
+  onClear,
+}: {
+  report: ConnectionReport;
+  local: boolean;
+  onAdopt: (architectureId: string, patterns: string[]) => void;
+  onClear: () => void;
+}) {
   const shown = report.architectures.filter(
     (a) => a.status !== 'infeasible' || a.patterns.length === 1,
   );
@@ -1514,12 +2187,33 @@ function Frontier({ report }: { report: ConnectionReport }) {
         problem and obligation. Dominated architectures stay visible with the
         architecture that beats them.
       </p>
+      {report.adoption && (
+        <p
+          className={`notice adoption-${report.adoption.status}`}
+          role="status"
+        >
+          Author adoption: <strong>{readable(report.adoption.status)}</strong>.{' '}
+          {report.adoption.reason}{' '}
+          {local && (
+            <button className="text-button" onClick={onClear}>
+              Clear adoption
+            </button>
+          )}
+        </p>
+      )}
       <ol aria-label="Architecture frontier">
         {shown.map((a) => (
           <ArchitectureRow
             key={a.id}
             a={a}
-            selected={a.id === report.selectedArchitectureId}
+            engineSelected={a.id === report.selectedArchitectureId}
+            adopted={a.id === report.adoptedArchitectureId}
+            canAdopt={
+              local &&
+              a.frontier &&
+              a.status === 'feasible_under_declared_assumptions'
+            }
+            onAdopt={() => onAdopt(a.id, a.patterns)}
           />
         ))}
       </ol>
@@ -1554,25 +2248,44 @@ function Frontier({ report }: { report: ConnectionReport }) {
 }
 function ArchitectureRow({
   a,
-  selected,
+  engineSelected,
+  adopted,
+  canAdopt,
+  onAdopt,
 }: {
   a: ArchitectureCandidate;
-  selected: boolean;
+  engineSelected: boolean;
+  adopted: boolean;
+  canAdopt: boolean;
+  onAdopt: () => void;
 }) {
   return (
-    <li className={selected ? 'architecture-row selected' : 'architecture-row'}>
+    <li
+      className={
+        engineSelected || adopted
+          ? 'architecture-row selected'
+          : 'architecture-row'
+      }
+    >
       <div>
         <strong>{a.patterns.join(' + ')}</strong>
         <span className={`status ${a.status}`}>{readable(a.status)}</span>
         <small>
-          {selected
-            ? 'Selected'
-            : a.frontier
-              ? 'On the frontier'
-              : a.dominatedBy
-                ? `Dominated by ${a.dominatedBy}`
-                : ''}
+          {adopted
+            ? 'Author adopted'
+            : engineSelected
+              ? 'Engine selected'
+              : a.frontier
+                ? 'On the frontier'
+                : a.dominatedBy
+                  ? `Dominated by ${a.dominatedBy}`
+                  : ''}
         </small>
+        {canAdopt && !adopted && (
+          <button className="text-button" onClick={onAdopt}>
+            Adopt
+          </button>
+        )}
       </div>
       <details>
         <summary>Proof</summary>

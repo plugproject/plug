@@ -72,9 +72,11 @@
             "observed",
             "synthetic",
             "static",
-            "unknown"
+            "probed",
+            "unknown",
+            "judged"
           ],
-          "description": "`static` facts are parsed from local code, configuration or contract files."
+          "description": "`static` facts are parsed from local code, configuration or contract files. `probed` facts were measured by a bounded, author-authorized local probe; they describe that workbench vantage and are never production verification. `judged` facts are model judgments pinned to their exact inputs; they qualify a verdict and are never production verification."
         },
         "note": {
           "type": "string"
@@ -327,6 +329,108 @@
       "additionalProperties": false,
       "description": "How a later result can reach the caller."
     },
+    "RequestBinding": {
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "type": "string",
+          "enum": [
+            "http",
+            "mcp",
+            "a2a"
+          ]
+        },
+        "method": {
+          "type": "string"
+        },
+        "pathTemplate": {
+          "type": "string"
+        },
+        "query": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "bodyTemplate": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/JsonValue"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "samples": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/JsonObject"
+          }
+        },
+        "samplesEvidence": {
+          "$ref": "#/definitions/Evidence"
+        }
+      },
+      "required": [
+        "protocol",
+        "method",
+        "pathTemplate",
+        "query",
+        "headers",
+        "bodyTemplate",
+        "samples",
+        "samplesEvidence"
+      ],
+      "additionalProperties": false,
+      "description": "A bounded request recipe. Header values may reference `${env:NAME}` and those environment values are resolved only at execution time."
+    },
+    "ResponseBinding": {
+      "type": "object",
+      "properties": {
+        "dataPointer": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "snapshotPointer": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "snapshotHeader": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "timestampFormat": {
+          "type": "string",
+          "enum": [
+            "iso-8601",
+            "epoch-milliseconds",
+            "epoch-seconds",
+            "unknown"
+          ]
+        }
+      },
+      "required": [
+        "dataPointer",
+        "snapshotPointer",
+        "snapshotHeader",
+        "timestampFormat"
+      ],
+      "additionalProperties": false,
+      "description": "How a response is projected into the data and source-time used by a runner. JSON pointers are RFC 6901 pointers; null leaves that field unavailable."
+    },
     "Operation": {
       "type": "object",
       "properties": {
@@ -364,6 +468,22 @@
         },
         "interaction": {
           "$ref": "#/definitions/Interaction"
+        },
+        "binding": {
+          "type": "object",
+          "properties": {
+            "request": {
+              "$ref": "#/definitions/RequestBinding"
+            },
+            "response": {
+              "$ref": "#/definitions/ResponseBinding"
+            }
+          },
+          "required": [
+            "request",
+            "response"
+          ],
+          "additionalProperties": false
         },
         "metadata": {
           "$ref": "#/definitions/JsonObject"
@@ -446,8 +566,7 @@
           "items": {
             "$ref": "#/definitions/Operation"
           },
-          "description": "Up to four selected operations per system.",
-          "maxItems": 4,
+          "description": "Operations this system exposes or calls.",
           "minItems": 1
         },
         "trustDomain": {
@@ -974,6 +1093,62 @@
       ],
       "additionalProperties": false
     },
+    "SemanticEquivalence": {
+      "type": "object",
+      "properties": {
+        "equivalent": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "outputMeaning": {
+          "type": "string"
+        },
+        "usefulOutput": {
+          "type": "string"
+        },
+        "evidence": {
+          "$ref": "#/definitions/Evidence"
+        }
+      },
+      "required": [
+        "equivalent",
+        "outputMeaning",
+        "usefulOutput",
+        "evidence"
+      ],
+      "additionalProperties": false,
+      "description": "A recorded judgment that the declared output meaning satisfies the required useful output. It binds to the exact judged strings: when either changes, the judgment is void and the strict comparison applies again."
+    },
+    "AdoptedArchitecture": {
+      "type": "object",
+      "properties": {
+        "architectureId": {
+          "type": "string"
+        },
+        "patterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "catalogVersion": {
+          "type": "string"
+        },
+        "evidence": {
+          "$ref": "#/definitions/Evidence"
+        }
+      },
+      "required": [
+        "architectureId",
+        "patterns",
+        "catalogVersion",
+        "evidence"
+      ],
+      "additionalProperties": false,
+      "description": "An architecture choice explicitly adopted by the author. The engine re-verifies the pattern set against every new input and catalog version."
+    },
     "Connection": {
       "type": "object",
       "properties": {
@@ -1038,6 +1213,26 @@
         },
         "remainingPath": {
           "$ref": "#/definitions/RemainingPath"
+        },
+        "semanticEquivalence": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/SemanticEquivalence"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "adoptedArchitecture": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AdoptedArchitecture"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -1068,18 +1263,16 @@
           "items": {
             "$ref": "#/definitions/SystemDescription"
           },
-          "description": "Two to eight systems.",
-          "minItems": 2,
-          "maxItems": 8
+          "description": "At least two systems.",
+          "minItems": 2
         },
         "connections": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/Connection"
           },
-          "description": "One to twelve connections; operations may take part in several.",
-          "minItems": 1,
-          "maxItems": 12
+          "description": "Connections may share systems and operations.",
+          "minItems": 1
         },
         "infrastructure": {
           "$ref": "#/definitions/Infrastructure",
@@ -2129,6 +2322,14 @@
         },
         "executableHere": {
           "type": "boolean"
+        },
+        "origin": {
+          "type": "string",
+          "enum": [
+            "planned",
+            "adopted"
+          ],
+          "description": "`planned` comes from bounded composition; `adopted` was checked on demand."
         }
       },
       "required": [
@@ -2192,6 +2393,36 @@
             "string",
             "null"
           ]
+        },
+        "adoptedArchitectureId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Author-adopted design when it remains valid under this exact analysis."
+        },
+        "adoption": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "honored",
+                "dominated",
+                "not_feasible",
+                "unknown_architecture",
+                "catalog_changed"
+              ]
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "reason"
+          ],
+          "additionalProperties": false
         },
         "policyDecisionNeeded": {
           "type": "boolean",
@@ -2324,6 +2555,12 @@
                           "string",
                           "null"
                         ]
+                      },
+                      "adoptedArchitectureId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
                       }
                     },
                     "required": [
@@ -2332,8 +2569,7 @@
                       "architectureId"
                     ],
                     "additionalProperties": false
-                  },
-                  "maxItems": 12
+                  }
                 }
               },
               "required": [
@@ -2499,6 +2735,489 @@
       ],
       "additionalProperties": false,
       "description": "Fixed trusted-local HTTP response envelope; data is checked against the selected output contract."
+    },
+    "AuthorizedHost": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "type": "string"
+        },
+        "addedAt": {
+          "type": "string"
+        },
+        "addedVia": {
+          "type": "string",
+          "enum": [
+            "ui",
+            "mcp",
+            "cli"
+          ]
+        }
+      },
+      "required": [
+        "host",
+        "addedAt",
+        "addedVia"
+      ],
+      "additionalProperties": false,
+      "description": "A host the author added to the local workbench. The value is an origin (`scheme://host[:port]`), never a URL containing credentials or a path."
+    },
+    "ProbeEvent": {
+      "type": "object",
+      "properties": {
+        "formatVersion": {
+          "$ref": "#/definitions/FormatVersion"
+        },
+        "systemId": {
+          "type": "string"
+        },
+        "operationId": {
+          "type": "string"
+        },
+        "at": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "plan",
+            "request-start",
+            "response",
+            "rate-limit",
+            "error",
+            "complete"
+          ]
+        },
+        "attempt": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "durationMs": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "status": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "bytes": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "sample": {
+          "$ref": "#/definitions/JsonValue"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "formatVersion",
+        "systemId",
+        "operationId",
+        "at",
+        "type",
+        "message"
+      ],
+      "additionalProperties": false,
+      "description": "One append-only event from a bounded local integration probe."
+    },
+    "OperationManifest": {
+      "type": "object",
+      "properties": {
+        "formatVersion": {
+          "$ref": "#/definitions/FormatVersion"
+        },
+        "manifestHash": {
+          "type": "string"
+        },
+        "systemId": {
+          "type": "string"
+        },
+        "operationId": {
+          "type": "string"
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "measuredAt": {
+          "type": "string"
+        },
+        "windowMs": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "sampleSize": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "vantage": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "local-workbench"
+            },
+            "nodeVersion": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "nodeVersion"
+          ],
+          "additionalProperties": false
+        },
+        "latencyMs": {
+          "type": "object",
+          "properties": {
+            "p50": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Quantity"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "p90": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Quantity"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "p95": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Quantity"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "max": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Quantity"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "p50",
+            "p90",
+            "p95",
+            "max"
+          ],
+          "additionalProperties": false
+        },
+        "availability": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Fraction"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "responseBytes": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Quantity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "statusHistogram": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/Quantity"
+          }
+        },
+        "rateLimitHeaders": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "cacheHeaders": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "timestampCandidates": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sourceTimestamp": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "pointer": {
+                  "type": "string"
+                },
+                "format": {
+                  "type": "string",
+                  "enum": [
+                    "iso-8601",
+                    "epoch-milliseconds",
+                    "epoch-seconds",
+                    "unknown"
+                  ]
+                },
+                "probability": {
+                  "$ref": "#/definitions/Fraction"
+                },
+                "model": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "pointer",
+                "format",
+                "probability",
+                "model"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "usefulOutput": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "probability": {
+                  "$ref": "#/definitions/Fraction"
+                },
+                "model": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "probability",
+                "model"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "changeIntervalMs": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Quantity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stoppedByRateLimit": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "formatVersion",
+        "manifestHash",
+        "systemId",
+        "operationId",
+        "endpoint",
+        "measuredAt",
+        "windowMs",
+        "sampleSize",
+        "vantage",
+        "latencyMs",
+        "availability",
+        "responseBytes",
+        "statusHistogram",
+        "rateLimitHeaders",
+        "cacheHeaders",
+        "timestampCandidates",
+        "sourceTimestamp",
+        "usefulOutput",
+        "changeIntervalMs",
+        "stoppedByRateLimit"
+      ],
+      "additionalProperties": false,
+      "description": "Bounded measurements for one operation from one local-workbench vantage."
+    },
+    "VerificationRecord": {
+      "type": "object",
+      "properties": {
+        "formatVersion": {
+          "$ref": "#/definitions/FormatVersion"
+        },
+        "connectionId": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "as-is",
+            "design"
+          ]
+        },
+        "verdict": {
+          "type": "string",
+          "enum": [
+            "demonstrated",
+            "not_demonstrated",
+            "inconclusive"
+          ]
+        },
+        "inputHash": {
+          "type": "string"
+        },
+        "designHash": {
+          "type": "string"
+        },
+        "revisionId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "architectureId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "measuredAt": {
+          "type": "string"
+        },
+        "windowMs": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "sampleSize": {
+          "$ref": "#/definitions/Quantity"
+        },
+        "vantage": {
+          "type": "string",
+          "const": "local-workbench"
+        },
+        "requirement": {
+          "type": "object",
+          "properties": {
+            "usefulOutput": {
+              "type": "string"
+            },
+            "latencyTargetMs": {
+              "$ref": "#/definitions/Quantity"
+            },
+            "scope": {
+              "type": "string",
+              "enum": [
+                "warmHits",
+                "trafficPercentile",
+                "everyRequest"
+              ]
+            },
+            "targetPercentile": {
+              "$ref": "#/definitions/Fraction"
+            }
+          },
+          "required": [
+            "usefulOutput",
+            "latencyTargetMs",
+            "scope",
+            "targetPercentile"
+          ],
+          "additionalProperties": false
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "withinTarget": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Fraction"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "latencyP95Ms": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Quantity"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "usefulOutputProbability": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Fraction"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "judgeModel": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "withinTarget",
+            "latencyP95Ms",
+            "usefulOutputProbability",
+            "judgeModel"
+          ],
+          "additionalProperties": false
+        },
+        "evidence": {
+          "$ref": "#/definitions/Evidence"
+        }
+      },
+      "required": [
+        "formatVersion",
+        "connectionId",
+        "mode",
+        "verdict",
+        "inputHash",
+        "designHash",
+        "revisionId",
+        "architectureId",
+        "measuredAt",
+        "windowMs",
+        "sampleSize",
+        "vantage",
+        "requirement",
+        "result",
+        "evidence"
+      ],
+      "additionalProperties": false,
+      "description": "A bounded workbench demonstration pinned to an exact spec and design."
     },
     "WorkspaceFinding": {
       "type": "object",

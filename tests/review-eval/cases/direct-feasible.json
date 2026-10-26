@@ -1,0 +1,8 @@
+{
+  "id": "direct-feasible",
+  "input": "schema/draft/examples/DesignInput/flight.json",
+  "variant": "direct-feasible",
+  "operationalContext": "",
+  "expectedEngine": "direct",
+  "expectedAdoptable": ["direct", "scheduled-cache"]
+}

@@ -2,6 +2,7 @@ import express from 'express';
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import type { DemoEvent } from '../../packages/plug/src/contracts/index';
 import {
+  hostedDocumentLimit,
   parseInput,
   selectedOperation,
 } from '../../packages/plug/src/contracts/index';
@@ -107,7 +108,9 @@ export function createApp(
   app.get('/api/examples', (_req, res) => res.json({ flight: flightInput() }));
   app.post('/api/analyze', (req, res) => {
     const report = suggestDesign(
-      typeof req.body === 'string' ? parseInput(req.body) : req.body,
+      typeof req.body === 'string'
+        ? parseInput(req.body, hostedDocumentLimit)
+        : req.body,
     );
     metrics.analyses++;
     if (report.missingInformation.length) metrics.missingInformation++;

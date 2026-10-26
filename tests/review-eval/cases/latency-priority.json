@@ -1,0 +1,8 @@
+{
+  "id": "latency-priority",
+  "input": "schema/draft/examples/DesignInput/flight.json",
+  "variant": "latency-priority",
+  "operationalContext": "",
+  "expectedEngine": "scheduled-cache",
+  "expectedAdoptable": ["scheduled-cache", "direct"]
+}

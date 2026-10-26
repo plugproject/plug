@@ -21,14 +21,13 @@ import { assertContract, guardDocument } from '../contracts/index';
 import type {
   Evidence,
   Interface,
-  JsonObject,
   Operation,
   Semantics,
   SystemDescription,
   WorkspaceFinding,
   WorkspaceIndex,
 } from '../contracts/index';
-import { importA2a } from '../importers/index';
+import { importA2a, openApiOperations } from '../importers/index';
 export const indexerVersion = 'indexer-1';
 export const indexLimits = {
   files: 2000,
@@ -229,7 +228,6 @@ const lexicalMarkers: {
     pattern: /\bauthorization\b|\bbearer\b|\bmtls\b|\boauth/i,
   },
 ];
-const httpMethods = ['get', 'head', 'put', 'patch', 'delete', 'post'] as const;
 const staticEvidence = (
   note: string,
   type: string,
@@ -243,12 +241,6 @@ const slug = (s: string) =>
     .slice(0, 64) || 'operation';
 const isObject = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
-const hasRef = (v: unknown): boolean =>
-  Array.isArray(v)
-    ? v.some(hasRef)
-    : isObject(v)
-      ? Object.hasOwn(v, '$ref') || Object.values(v).some(hasRef)
-      : false;
 const aborted = (signal?: AbortSignal) => {
   if (signal?.aborted) throw new Error('Indexing cancelled');
 };
@@ -323,77 +315,6 @@ const unknownSemantics = (evidence: Evidence): Semantics => ({
   requiresLiveValidation: true,
   evidence,
 });
-function jsonSchemaOf(content: unknown): JsonObject | null {
-  if (!isObject(content)) return null;
-  const media = content['application/json'];
-  if (!isObject(media) || !isObject(media.schema) || hasRef(media.schema))
-    return null;
-  return media.schema as JsonObject;
-}
-function openApiOperations(doc: Record<string, unknown>, location: string) {
-  const ops: (Operation & { method: string; path: string })[] = [];
-  const paths = isObject(doc.paths) ? doc.paths : {};
-  for (const path of Object.keys(paths).sort()) {
-    const item = paths[path];
-    if (!isObject(item)) continue;
-    for (const method of httpMethods) {
-      const op = item[method];
-      if (!isObject(op)) continue;
-      const params = [
-        ...(Array.isArray(item.parameters) ? item.parameters : []),
-        ...(Array.isArray(op.parameters) ? op.parameters : []),
-      ];
-      const keyed = params.some(
-        (p) =>
-          isObject(p) &&
-          p.in === 'header' &&
-          typeof p.name === 'string' &&
-          p.name.toLowerCase() === 'idempotency-key',
-      );
-      const effect =
-        method === 'get' || method === 'head'
-          ? 'read'
-          : method === 'post'
-            ? 'unknown'
-            : 'write';
-      const responses = isObject(op.responses) ? op.responses : {};
-      const success = ['200', '201', '202'].find((c) => isObject(responses[c]));
-      const evidence = staticEvidence(
-        `${method.toUpperCase()} ${path} in an OpenAPI document; effect from HTTP method semantics, verify against the implementation.`,
-        'openapi',
-        location,
-      );
-      ops.push({
-        method,
-        path,
-        id: slug(
-          typeof op.operationId === 'string'
-            ? op.operationId
-            : `${method}-${path}`,
-        ),
-        interfaceId: 'http-server',
-        description:
-          typeof op.summary === 'string'
-            ? op.summary
-            : `${method.toUpperCase()} ${path}`,
-        inputSchema: isObject(op.requestBody)
-          ? jsonSchemaOf(op.requestBody.content)
-          : null,
-        outputSchema: success
-          ? jsonSchemaOf(
-              (responses[success] as Record<string, unknown>).content,
-            )
-          : null,
-        semantics: {
-          ...unknownSemantics(evidence),
-          effect,
-          idempotencyKeySupported: keyed ? true : null,
-        },
-      });
-    }
-  }
-  return ops;
-}
 function parseStructured(file: ScannedFile): unknown {
   const ext = extname(file.path).toLowerCase();
   if (ext === '.json') return JSON.parse(file.text);
@@ -520,10 +441,11 @@ export async function indexWorkspace(
           evidence: staticEvidence('OpenAPI document', 'openapi', file.path),
         });
         for (const op of ops) {
+          const http = op.metadata?.http as { method: string; path: string };
           add({
             kind: 'operation',
             name: op.id,
-            detail: `${op.method.toUpperCase()} ${op.path}`,
+            detail: `${http.method.toUpperCase()} ${http.path}`,
             evidence: op.semantics.evidence,
           });
           if (op.semantics.idempotencyKeySupported)
@@ -549,9 +471,7 @@ export async function indexWorkspace(
             gaps.push(
               `${op.id}: structured request/response schemas are missing or use $ref; supply resolved schemas`,
             );
-          const { method: _m, path: _p, ...operation } = op;
-          if (!operations.some((o) => o.id === operation.id))
-            operations.push(operation);
+          if (!operations.some((o) => o.id === op.id)) operations.push(op);
         }
         if (ops.length)
           addInterface({
@@ -685,11 +605,7 @@ export async function indexWorkspace(
     gaps.push(
       'An HTTP server framework is declared but no OpenAPI document was found; describe the exposed operations.',
     );
-  if (operations.length > 4)
-    gaps.push(
-      `${operations.length} operations found; the draft keeps the first four. Select the operations on the connection path.`,
-    );
-  const selected = operations.slice(0, 4);
+  const selected = operations;
   const usedInterfaces = interfaces.filter(
     (i) =>
       selected.some((o) => o.interfaceId === i.id) || i.direction === 'calls',

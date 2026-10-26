@@ -2,7 +2,8 @@
 title: Architecture
 ---
 
-A design input holds two to eight systems and one to twelve connections. Each
+A design input holds two or more systems and any number of connections that fit
+within the document and runtime resource bounds. Each
 connection selects a caller operation and a downstream operation on distinct
 systems, with its own mappings, profile, workload, experience and remaining path;
 infrastructure is shared. Each connection selects a distinct operation pair, and
@@ -23,6 +24,15 @@ mapping validation supports explicit top-level fields; nested transforms require
 an adapter and remain prerequisites. Analysis has no network calls, LLM or ambient
 telemetry. Hosted submitted descriptions never become executable bindings.
 
+Semantic equivalence is the one judgmental gate. `semanticMatch` passes on exact
+string equality, or under a recorded `Connection.semanticEquivalence` judgment
+pinned to the exact judged strings; when either string changes the judgment is
+void and the strict comparison applies again. Judgments answer the registered
+question `output-equivalence` (version 1) with a typed verdict — equivalent,
+confidence, bounded rationale — recorded as `judged` evidence. They qualify a
+verdict; they never verify production behavior, and analysis itself still makes
+no model calls: judging is an explicit author action in the local workbench.
+
 Manual descriptions, MCP 2025-11-25 tools/list and A2A 1.0 Agent Cards are supported.
 MCP wrappers provide server identity and negotiated version. Remaining nextCursor
 means incomplete discovery. Missing MCP inputSchema is an error. A2A skills do not
@@ -37,13 +47,78 @@ rejects foreign Host and Origin headers, and allows one sandbox. Its workspace
 endpoints exist only locally; the hosted playground never offers them.
 
 `POST /api/discover`, also local only, lists an MCP server's tools over Streamable
-HTTP (initialize, paginated `tools/list`, end of session; never a tool call) or reads
-an A2A Agent Card at the given URL or its well-known locations (never a message). Up
-to eight request headers are used for that discovery only and are never stored,
+HTTP (initialize, paginated `tools/list`, end of session; never a tool call), reads
+an A2A Agent Card at the given URL or its well-known locations (never a message), or
+reads one OpenAPI document (JSON or YAML; never an operation call) and drafts its
+operations with method and path kept under `metadata.http`, inline schemas, and the
+first `servers` entry resolved against the document URL as the interface endpoint.
+Up to eight request headers are used for that discovery only and are never stored,
 logged or returned; URLs are kept without credentials, query or fragment. It follows
 at most three redirects within the origin and stops at 15 seconds, 1 MB per response,
-20 pages or 500 tools. The author picks up to four listed tools or skills, which pass
-through the importers above.
+20 pages or 500 tools or operations. The author picks the listed tools, skills
+or operations to add, which pass through the importers above. Results carry `fetchMs`, the
+workbench's own fetch time — a synthetic observation, not a production measurement —
+and a freshly added system focuses the discovery URL so indexing comes first.
+
+`POST /api/judge`, also local only, runs one `output-equivalence` judgment over the
+two supplied texts (bounded, 30-second deadline, caller cancellation) and appends
+the verdict to `.plug/judgments.jsonl`. The provider comes from the environment:
+`PLUG_JUDGE_PROVIDER` (`typesafe`, `anthropic`, `openai`, or the explicit
+non-model `stub`), `PLUG_JUDGE_MODEL` and the matching API key. TypeSafe Jev is
+preferred when `TYPESAFE_API_KEY` is present: it answers a typed Noul question,
+and code applies the 0.7 equivalence threshold. Without a configured provider the
+route fails closed with instructions. Only the author-supplied texts are sent —
+never endpoints, headers or workspace contents. The hosted playground has no
+judge. `plug ui` loads credentials from the selected workspace's ignored
+`.env.local` when it exists.
+
+`POST /api/draft`, also local only, proposes author-adoptable facts from bounded
+selected operation descriptions, schemas and sanitized stored metadata. The
+private v1 allowlist is downstream output meaning, mechanically compatible
+contract mappings and a hard per-minute downstream quota. Every proposal must
+carry an exact supporting quote; code verifies the quote, mapping coverage and
+quota value/unit before returning it. When TypeSafe is configured, one bundled
+Noul per proposal cross-checks whether its quote explicitly supports its fact;
+probability below 0.7 disables adoption. Drafting never mutates DesignInput.
+Explicit adoption uses the normal undo-aware editor path and writes ordinary
+declared evidence where the public schema has an evidence field. Results are
+appended to `.plug/drafts.jsonl`; provider selection uses
+`PLUG_DRAFT_PROVIDER`, `PLUG_DRAFT_MODEL` and the matching Anthropic or OpenAI
+key (or the explicit test stub). Endpoints, headers, credentials, discovery URLs
+and synthetic discovery timing are never sent to the drafter.
+
+## Authorized probing and edge verification
+
+Adding a host in the local workbench first discloses that its exposed integration
+points become eligible for inspection. The author may add and inspect immediately
+or defer inspection. Authorization is stored by exact HTTP(S) origin in
+`.plug/hosts.json`; credentials remain environment references. Hosted routes do
+not exist and analysis, import, review and spec generation never invoke endpoints.
+
+`POST /api/probe` plans bounded calls for authorized operations, automatically
+executes only protocol-safe reads, preserves cancellation, timeout, byte, rate and
+per-host call limits, and never executes writes or unknown-effect operations. Its
+operation manifests record local-workbench vantage, measurement time, sample size,
+window, latency distribution, statuses, safe headers and source timestamp
+candidates. Applying a manifest creates `probed` evidence; it cannot establish a
+traffic SLO or cache permission.
+
+`POST /api/verify` demonstrates an edge as-is or through a supported selected
+design against the same authorized binding. A `VerificationRecord` is pinned to the
+design hash and spec revision and says demonstrated, not demonstrated or
+inconclusive. Jev may judge whether a delivered sample satisfies the declared
+useful output; it does not choose the architecture. Engine feasibility and a
+workbench demonstration remain separate claims.
+
+## Design review and adoption
+
+The deterministic engine remains authoritative for criteria and feasibility. An
+optional local critic reviews a bounded, scrubbed report slice and returns strict
+JSON with cited concerns and alternatives. Exact citations are mechanically gated;
+Jev independently answers typed review questions. Models may recommend but never
+adopt. The author can pin an architecture with evidence, and every analysis
+re-verifies that exact base and pattern set. An infeasible or dominated pin is
+rejected; changed facts can mark a prior pin superseded.
 
 `plug index [dir] [--out file]` emits a `WorkspaceIndex`. The scan is bounded
 (2,000 files, 512 KB per file, 16 MB total, 500 findings), never follows symbolic

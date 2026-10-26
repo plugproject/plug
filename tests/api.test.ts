@@ -148,9 +148,19 @@ it('rejects oversized, deep and remote-reference inputs', async () => {
   };
   expect((await post('/api/analyze', input)).status).toBe(400);
 });
-it('never exposes workspace, index or spec endpoints on the hosted service', async () => {
-  for (const path of ['/api/workspace', '/api/workspace/spec'])
+it('never exposes workspace or local model endpoints on the hosted service', async () => {
+  for (const path of ['/api/workspace', '/api/workspace/spec', '/api/probe'])
     expect((await fetch(base + path)).status).toBe(404);
-  for (const path of ['/api/workspace/index', '/api/workspace/spec'])
+  for (const path of [
+    '/api/workspace/index',
+    '/api/workspace/spec',
+    '/api/discover',
+    '/api/judge',
+    '/api/draft',
+    '/api/probe',
+    '/api/verify',
+    '/api/review',
+    '/api/adopt',
+  ])
     expect((await post(path, { input: flightInput() })).status).toBe(404);
 });

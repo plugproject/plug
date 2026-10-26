@@ -12,6 +12,8 @@ import type {
   SystemDescription,
 } from '../../../../schema/draft/schema';
 export type * from '../../../../schema/draft/schema';
+export const hostedDocumentLimit = 256 * 1024;
+export const localDocumentLimit = 64 * 1024 * 1024;
 export function assertContract<T>(
   root: string,
   value: unknown,
@@ -55,9 +57,14 @@ export function guardDocument(value: unknown, depth = 0): void {
     }
   }
 }
-export function parseInput(text: string): unknown {
-  if (new TextEncoder().encode(text).length > 256 * 1024)
-    throw new Error('Description exceeds 256 KB');
+export function parseInput(
+  text: string,
+  maxBytes = localDocumentLimit,
+): unknown {
+  if (new TextEncoder().encode(text).length > maxBytes)
+    throw new Error(
+      `Description exceeds ${maxBytes === hostedDocumentLimit ? '256 KB' : '64 MB'}`,
+    );
   const doc = parseDocument(text, { schema: 'core', uniqueKeys: true });
   if (doc.errors.length || doc.warnings.length)
     throw new Error('Invalid YAML/JSON or unsupported tag');
@@ -105,8 +112,8 @@ export function compileOperationSchema(
   return engine.compile(contract);
 }
 export function normalizeSystems(systems: unknown): SystemDescription[] {
-  if (!Array.isArray(systems) || systems.length < 2 || systems.length > 8)
-    throw new Error('Two to eight systems are required');
+  if (!Array.isArray(systems) || systems.length < 2)
+    throw new Error('At least two systems are required');
   for (const system of systems)
     assertContract<SystemDescription>('SystemDescription', system);
   return structuredClone(systems) as SystemDescription[];

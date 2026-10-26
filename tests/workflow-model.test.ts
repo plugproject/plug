@@ -48,19 +48,12 @@ describe('workflow graph model', () => {
     expect(moveBlocked(d, agent('operation'), 'system')).toBeNull();
     expect(moveBlocked(d, agent('operation'), null)).toBeNull();
     for (let i = 0; i < 3; i++) addOperation(d, 'system');
-    expect(moveBlocked(d, agent('operation'), 'system')).toBe(
-      'Four operations per system is the alpha limit.',
-    );
+    expect(moveBlocked(d, agent('operation'), 'system')).toBeNull();
     for (let i = d.systems.length; i < 8; i++)
       d.systems.push(blankSystem(`extra-${i}`));
-    expect(moveBlocked(d, agent('operation'), null)).toBe(
-      'Eight systems is the alpha limit.',
-    );
-    const unchanged = structuredClone(d);
-    expect(() => moveOperation(d, agent('operation'), null)).toThrow(
-      'Eight systems is the alpha limit.',
-    );
-    expect(d).toEqual(unchanged);
+    expect(moveBlocked(d, agent('operation'), null)).toBeNull();
+    moveOperation(d, agent('operation'), null);
+    expect(d.systems).toHaveLength(9);
   });
   it('moves a caller operation into another system and clears its mappings', () => {
     const d = workflow();
@@ -206,15 +199,17 @@ describe('removing anything from the workflow', () => {
   });
   it('replaces a system’s operations, removing the connections of those it drops', () => {
     const d = workflow();
-    expect(() =>
+    const many = workflow();
+    expect(
       setOperations(
-        d,
+        many,
         'agent',
         Array.from({ length: 5 }, (_, i) =>
           blankOperation(`op-${i}`, 'http-client'),
         ),
       ),
-    ).toThrow('Four operations per system is the alpha limit.');
+    ).toEqual(['primary', 'connection']);
+    expect(many.systems[0].operations).toHaveLength(5);
     expect(() =>
       setOperations(d, 'agent', [
         blankOperation('same', 'http-client'),
